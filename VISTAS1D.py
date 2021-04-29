@@ -235,6 +235,12 @@ def main():
         SFD[:, ti + 1] = Stn.reshape((-1,))
 
     tFDEnd = time.time()
+    
+    # subsample (smaller dtFD needed to ensure convergence, but too dense for plotting)
+    NFD = NFD[:, ::int(dt/dtFD)]        
+    SFD = SFD[:, ::int(dt/dtFD)]
+    tevalFD = tevalFD[::int(dt/dtFD)]   # tevalFD = teval
+
     print()
     print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
     plotPower(tevalFD * 1e9, SFD, S2P, LPlm)
