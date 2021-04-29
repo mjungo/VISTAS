@@ -41,14 +41,14 @@ def params():
     tau_esc = 400e-12                   # thermionic emission lifetime (s)
     tau_cap = 45e-12                    # ambipolar diffusion time (s)
     eta_i = 0.9                         # current injection efficiency
-    rs = 1e-4                           # current spreading coefficient (cm)
+    rs = .5e-4                          # current spreading coefficient (cm)
     DN = 12                             # ambipolar diffusion coeff. (cm2/s)
 
     # gain parameters ---------------------------------------------------------
 
     Ntr = 1.8e18                        # transparency carrier density (cm-3)
-    #gln = 1400                         # logarithmic gain coefficient (cm-1)
-    g0 = 6e-16                          # linear gain coefficient (cm2)
+    gln = 1300                          # logarithmic gain coefficient (cm-1)
+    #g0 = 5e-16                         # linear gain coefficient (cm2)
     epsilon = 5e-17 * np.ones((20, 1))  # gain compression factor
 
     # cavity parameters ------------------------------------------------
@@ -111,6 +111,6 @@ def params():
     return \
         (wl0, Rt, Rb, alpha_int, beta, Gamma, \
             tau_N, tau_esc , tau_cap, eta_i, rs, DN, \
-                Ntr, g0, epsilon, \
+                Ntr, gln, epsilon, \
                     r_ox, r_cav, nc, ng, delta_n, L, V_cav, db, \
                         nrho, nphi)

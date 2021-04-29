@@ -44,7 +44,7 @@ def main():
  
     (wl0, Rt, Rb, alpha_int, beta, Gamma, \
             tau_N, tau_esc , tau_cap, eta_i, rs, DN, \
-                Ntr, g0, epsilon, \
+                Ntr, gln, epsilon, \
                     r_act, r_cav, nc, ng, delta_n, L, V_cav, db, \
                         nrho, nphi) \
                             = params()
@@ -156,8 +156,7 @@ def main():
 
     # coefficients array for calculating the average carrier density Na over the active area Na
     c_act = np.zeros((1, ni))
-    c_act = 2 / r_act**2 * np.trapz(J0i[:,0:round(nrho*r_act/r_cav)], \
-            rho[0:round(nrho*r_act/r_cav), :].T)    # integrates in the active area only
+    c_act = 2 / r_act**2 * np.trapz(J0i[:,0:round(nrho*r_act/r_cav)].T * rho[0:round(nrho*r_act/r_cav), :], rho[0:round(nrho*r_act/r_cav), :], axis = 0)    # integrates in the active area only
     c_act = c_act[:, np.newaxis].T  # (1, ni)
 
     # coefficients array that captures the spatial overlap between current and carrier profiles
@@ -201,7 +200,7 @@ def main():
 
     it = interp1d(x = teval, y = it, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
 
-    args = (ni, nm, c_inj, it, c_diff, g0, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
+    args = (ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
 
     tSolverStart = time.time()
     sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval = teval, method = 'RK23', dense_output = True, vectorized = True, args = args)
@@ -212,36 +211,34 @@ def main():
     plotPower(sol.t * 1e9, sol.y[ni:ni+nm], S2P, LPlm)
 
 
-    # # 6b. solution of system of ODEs using finite differences -------------------------------------------------------
+    # 6b. solution of system of ODEs using finite differences -------------------------------------------------------
 
-    # NFD = np.zeros((ni, ctFD))  # N0, N1, ..., NnN
-    # Na = np.zeros((1, ctFD))    # average carrier density across the active area
-    # SFD = np.zeros((nm, ctFD))  # multimode photon number matrix
+    NFD = np.zeros((ni, ctFD))  # N0, N1, ..., NnN
+    Na = np.zeros((1, ctFD))    # average carrier density across the active area
+    SFD = np.zeros((nm, ctFD))  # multimode photon number matrix
 
-    # Nto = np.zeros((ni, 1))
-    # Sto = np.zeros((nm, 1))
+    Nto = np.zeros((ni, 1))
+    Sto = np.zeros((nm, 1))
     
-    # tFDStart = time.time()
+    tFDStart = time.time()
     
-    # for ti in range(ctFD - 1):
-    #     Nto[:, 0] = NFD[:, ti]
-    #     Sto[:, 0] = SFD[:, ti]
+    for ti in range(ctFD - 1):
+        Nto[:, 0] = NFD[:, ti]
+        Sto[:, 0] = SFD[:, ti]
+
+        dNdt, dSdt = VISTASmodels.FD_1D(ti, Nto, Sto, ni, nm, c_act, c_inj, itFD[ti], c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp) # rhs of system of ODEs
+
+        Ntn = Nto + dtFD * dNdt             # Finite Differences step
+        NFD[:, ti + 1] = Ntn.reshape((-1,))
         
-    #     # g0=gln*log((Na(i)+1)/Ntr)/(Na(i)-Ntr) # Logarithmic time-dependent gain factor
+        Stn = Sto + dtFD * dSdt             # Finite Differences step
+        SFD[:, ti + 1] = Stn.reshape((-1,))
 
-    #     dNdt, dSdt = VISTASmodels.FD_1D(ti, Nto, Sto, ni, nm, c_inj, itFD[ti], c_diff, g0, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp) # rhs of system of ODEs
-
-    #     Ntn = Nto + dtFD * dNdt             # Finite Differences step
-    #     NFD[:, ti + 1] = Ntn.reshape((-1,))
-        
-    #     Stn = Sto + dtFD * dSdt             # Finite Differences step
-    #     SFD[:, ti + 1] = Stn.reshape((-1,))
-
-    # tFDEnd = time.time()
-
+    tFDEnd = time.time()
     print()
-    # print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
-    # plotPower(tevalFD * 1e9, SFD, S2P, LPlm)
+    print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
+    plotPower(tevalFD * 1e9, SFD, S2P, LPlm)
+
 
 
 def plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig):

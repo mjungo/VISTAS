@@ -26,13 +26,16 @@ import numpy as np
 
 # rhs of system of ODEs fed into solve_ivp solver ---------------------------------------------------
 
-def solver_1D(ti, NS, ni, nm, c_inj, it, c_diff, g0, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+def solver_1D(ti, NS, ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
     
     N = NS[0 : ni, 0]
     N=N[:, np.newaxis]
     S = NS[ni : ni + nm, 0]
     S=S[:, np.newaxis]
     
+    Na = np.matmul(c_act, N)                        # average carrier density over the active area
+    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)    # fitted time domain logarithmic gain factor
+
     Inj = c_inj * it(ti)                                        # current injection
     Diff = c_diff * N                                           # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
@@ -48,8 +51,11 @@ def solver_1D(ti, NS, ni, nm, c_inj, it, c_diff, g0, c_st, Ntr, epsilon, Gamma, 
 
 
 # rhs of system of ODEs fed into finite differences algorithm ---------------------------------------
-def FD_1D(ti, Nto, Sto, ni, nm, c_inj, it, c_diff, g0, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+def FD_1D(ti, Nto, Sto, ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
     
+    Na = np.matmul(c_act, Nto)                      # average carrier density over the active area
+    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)    # fitted time domain logarithmic gain factor
+
     Inj = c_inj * it                                            # current injection
     Diff = c_diff * Nto                                         # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, Nto)) \
