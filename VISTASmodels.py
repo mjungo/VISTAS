@@ -24,24 +24,51 @@
 
 import numpy as np
 
-# rhs of system of ODEs fed into solve_ivp solver ---------------------------------------------------
+# system of equations to be solved for calculation of LI characteristic
+def cw_1D(NS, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+    
+    N = NS[0 : ni]
+    N = N[:, np.newaxis]
+    S = NS[ni : ni + nm]
+    S = S[:, np.newaxis]
+    
+    #g0 = 5e-16
+    Na = np.matmul(c_act, N)                                # average carrier density over the active area
+    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)            # fitted time domain logarithmic gain factor
 
-def solver_1D(ti, NS, ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+    Inj = c_inj * It                                        # current injection term
+    Diff = c_diff * N                                       # carrier diffusion term
+    Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
+          - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination term
+    Rnst = c_nst * N                                        # non-stimulated photon recombination
+    Rsp = c_sp * S                                          # spontaneous photon recombination
+
+    Nsol = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
+    Ssol = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
+    NSsol = np.concatenate([Nsol, Ssol])
+    NSsol = NSsol.reshape((-1,))
+
+    return NSsol
+
+
+# system of ODEs to be solved for dynamic response calculation using solve_ivp solver
+def solver_1D(ti, NS, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
     
     N = NS[0 : ni, 0]
-    N=N[:, np.newaxis]
+    N = N[:, np.newaxis]
     S = NS[ni : ni + nm, 0]
-    S=S[:, np.newaxis]
+    S = S[:, np.newaxis]
     
-    Na = np.matmul(c_act, N)                        # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)    # fitted time domain logarithmic gain factor
+    #g0 = 5e-16
+    Na = np.matmul(c_act, N)                                # average carrier density over the active area
+    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)            # fitted time domain logarithmic gain factor
 
-    Inj = c_inj * it(ti)                                        # current injection
-    Diff = c_diff * N                                           # carrier diffusion
+    Inj = c_inj * It(ti)                                    # current injection
+    Diff = c_diff * N                                       # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
-          - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)        # stimulated recombination
-    Rnst = c_nst * N                                            # non-stimulated photon recombination
-    Rsp = c_sp * S                                              # spontaneous photon recombination
+          - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination
+    Rnst = c_nst * N                                        # non-stimulated photon recombination
+    Rsp = c_sp * S                                          # spontaneous photon recombination
 
     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
     dSdt = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
@@ -50,43 +77,22 @@ def solver_1D(ti, NS, ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon,
     return dNSdt
 
 
-# rhs of system of ODEs fed into finite differences algorithm ---------------------------------------
-def FD_1D(ti, Nto, Sto, ni, nm, c_act, c_inj, it, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+# system of ODEs to be solved for dynamic response calculation using finite differences
+def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
     
-    Na = np.matmul(c_act, Nto)                      # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)    # fitted time domain logarithmic gain factor
+    #g0 = 5e-16
+    Na = np.matmul(c_act, Nto)                              # average carrier density over the active area
+    g0 = gln * np.log((Na + 1) / Ntr) / (Na-Ntr)            # fitted time domain logarithmic gain factor
 
-    Inj = c_inj * it                                            # current injection
-    Diff = c_diff * Nto                                         # carrier diffusion
+    Inj = c_inj * It                                        # current injection
+    Diff = c_diff * Nto                                     # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, Nto)) \
-          - c_st[:, :, 0] * Ntr) * Sto / (1 + epsilon * Sto)    # stimulated recombination
-    Rnst = c_nst * Nto                                          # non-stimulated photon recombination
-    Rsp = c_sp * Sto                                            # spontaneous photon recombination
+         - c_st[:, :, 0] * Ntr) * Sto / (1 + epsilon * Sto) # stimulated recombination
+    Rnst = c_nst * Nto                                      # non-stimulated photon recombination
+    Rsp = c_sp * Sto                                        # spontaneous photon recombination
+    Rsp = c_sp * S                                          # spontaneous photon recombination
 
     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
     dSdt = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
     
     return dNdt, dSdt
-
-
-# def solver_1D_nvect(ti, NS, ni, nm, c_inj, it, c_diff, g0, c_st, Ntr, epsilon, Gamma, beta, tau_N, tau_S): 
-#     # non-vectorized implementation    
-#     NS=NS.reshape((-1,))
-#     N = NS[0 : ni]
-#     N=N[:, np.newaxis]
-#     S = NS[ni : ni + nm]
-#     S=S[:, np.newaxis]
-    
-#     Inj = c_inj * it                                    # current injection term
-#     Diff = c_diff * N                                   # carrier diffusion term
-#     Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
-#         - c_st[:, 0] * Ntr) * S / (1 + epsilon * S)     # stimulated recombination term
-#     Rnst = N / tau_N                                    # non-stimulated photon recombination term
-#     Rsp = S / tau_S                                     # spontaneous photon recombination term
-
-#     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-#     dSdt = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
-#     dNSdt = np.concatenate([dNdt, dSdt])
-#     dNSdt = dNSdt.reshape((-1,))
-
-#     return dNSdt
