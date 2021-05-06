@@ -45,12 +45,11 @@ def main():
     
     # 1. key parameters --------------------------------------------------------------------------------
  
-    (wl0, Rt, Rb, alpha_int, beta, Gamma, \
-            tau_N, tau_esc , tau_cap, eta_i, rs, DN, \
-                Ntr, gln, epsilon, \
-                    r_act, r_cav, nc, ng, delta_n, L, V_cav, db, \
-                        nrho, nphi) \
-                            = params()
+    (r_act, r_cav, Leff, V_cav, Gam_z, \
+        wl0, nc, ng, delta_n, Rt, Rb, alpha_i, tau_N, beta, \
+            gln, Ntr, epsilon, Gam_r, \
+                eta_i, rs, DN, \
+                    nrho, nphi) = params()
 
     q = 1.602e-19       # elementary charge [C]
     h = 6.626e-34       # Planck constant [Js]
@@ -82,12 +81,11 @@ def main():
         plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig = 1)
 
     # size correction of parameters defined individually for each mode
-    Rt = Rt[0:nm, :]
-    Rb = Rb[0:nm, :]
-    alpha_int = alpha_int[0:nm, :]
-    epsilon = epsilon[0:nm, :]
-    beta = beta[0:nm, :]
-    Gamma = Gamma[0:nm, :]
+    alpha_m = 1 / Leff * np.log(1 / np.sqrt(Rt * Rb)) * np.ones((nm, 1))   # mirror losses
+    alpha_i = alpha_i * np.ones((nm, 1))
+    epsilon = epsilon * np.ones((nm, 1))
+    beta = beta * np.ones((nm, 1))
+    Gam_z = Gam_z * np.ones((nm, 1))
 
     
     # 3. radial injection current profile --------------------------------------------------------------
@@ -181,18 +179,18 @@ def main():
             for j in range(ni):
                     prodTmp = J0i[j, :] * Ur[m, :] * J0i[i, :] * rho.reshape((-1,)) # reshape -> dim (nrho, )
                     prodTmp = prodTmp[:, np.newaxis]
-                    c_st[m, i, j] = 2 * vg / (r_cav * jn(0, gammai[i]))**2 * np.trapz(prodTmp, rho, axis = 0)    
+                    c_st[m, i, j] = 2 * Gam_r * vg / (r_cav * jn(0, gammai[i]))**2 * np.trapz(prodTmp, rho, axis = 0)    
 
     # coefficients array that describes optical losses and outcoupling (= 1 / tau_S)
-    c_sp = np.ones((nm, 1)) # assymettry (e.g. different internal losses) may be introduced for each mode
-    alpha_m = 1 / L * np.log(1 / np.sqrt(Rt * Rb));         # mirror losses
-    c_sp = c_sp * vg * (alpha_m + alpha_int) 
+    c_olo = np.ones((nm, 1)) # assymettry (e.g. different internal losses) may be introduced for each mode
+    c_olo = c_olo * vg * (alpha_m + alpha_i) 
     
+    # parameters for optical power calculation
     F = (1 - Rt) / ((1 - Rt) + np.sqrt(Rt / Rb) * (1 - Rb)) # fraction of power emitted at the top facet
-    eta_opt = F * alpha_m / (alpha_int + alpha_m)           # optical efficiency (eta_opt*eta_i=eta_d)  
-    S2P = V_cav * hvl / wl0 * eta_opt * c_sp / Gamma * 1e3 # convert photon density to optical power (nm, 1)
-
-
+    eta_opt = F * alpha_m / (alpha_i + alpha_m)             # optical efficiency (eta_opt*eta_i=eta_d)  
+    S2P = eta_opt * hvl / wl0 * V_cav * c_olo / Gam_z * 1e3 # conversion factor photon density -> optical power (nm, 1)
+    
+    
     # 6. steady-state (LI) solution --------------------------------------------------------------------
 
     Imax = 10e-3                                # current range for LI characteristic
@@ -200,11 +198,11 @@ def main():
     Icw = np.arange(0, Imax, dI)                # current vector
     NScw = np.zeros((ni + nm, Icw.shape[0]))    # NS solution matrix (ni+nm, Imax / dI)
     NScw[0:ni, 1] = (c_inj * Icw[1] / (c_nst + c_diff)).reshape((-1,))  # N-analytical solution (Rst = 0) for 2nd current step
-    NScw[ni:ni + nm, 1] = np.maximum((Gamma * beta * c_nst * NScw[0, 1] / c_sp).reshape((-1,)), 0) # S-analytical solution (Rst = 0) for 2nd current step
+    NScw[ni:ni + nm, 1] = np.maximum((Gam_z * beta * c_nst * NScw[0, 1] / c_olo).reshape((-1,)), 0) # S-analytical solution (Rst = 0) for 2nd current step
 
     tcwSolverStart = time.time()    
     for i in range(2, Icw.shape[0], 1): # sol@0: 0, sol@1: NScw[:, 1] -> calculated analytically above
-        args = (ni, nm, c_act, c_inj, Icw[i], c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
+        args = (ni, nm, c_act, c_inj, Icw[i], c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo)
         NScw[:, i] = fsolve(VISTASmodels.cw_1D, NScw[:, i - 1], args = args, fprime = VISTASmodels.Jac_cw_1D)
     tcwSolverEnd = time.time()
 
@@ -219,7 +217,7 @@ def main():
     NSinit = np.zeros((ni + nm))
 
     It = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
-    args = (ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
+    args = (ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo)
     
     tSolverStart = time.time()
     sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval = teval, method = 'RK45', dense_output = True, vectorized = True, args = args)
@@ -246,7 +244,7 @@ def main():
     #     Nto[:, 0] = NFD[:, ti]
     #     Sto[:, 0] = SFD[:, ti]
 
-    #     dNdt, dSdt = VISTASmodels.FD_1D(Nto, Sto, ni, nm, c_act, c_inj, itFD[ti], c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp) # rhs of system of ODEs
+    #     dNdt, dSdt = VISTASmodels.FD_1D(Nto, Sto, ni, nm, c_act, c_inj, itFD[ti], c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo) # rhs of system of ODEs
 
     #     Ntn = Nto + dtFD * dNdt             # Finite Differences step
     #     NFD[:, ti + 1] = Ntn.reshape((-1,))

@@ -27,7 +27,7 @@ import numpy as np
 # system of equations to be solved for calculation of steady-state (LI) characteristic
 def cw_1D(y, *args): 
     
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp = args
+    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo = args
 
     N = y[0 : ni]
     N = N[:, np.newaxis]
@@ -43,10 +43,10 @@ def cw_1D(y, *args):
     Diff = c_diff * N                                       # carrier diffusion term
     Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
           - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination term
-    Rsp = c_sp * S                                        # optical losses and outcoupling term
+    Rolo = c_olo * S                                        # optical losses and outcoupling term
 
     Nsol = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    Ssol = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
+    Ssol = -Rolo + Gam_z * beta * Rnst[0, :] + Gam_z * Rst[:, 0][:, np.newaxis]
     NSsol = np.concatenate([Nsol, Ssol])
     NSsol = NSsol.reshape((-1,))
 
@@ -55,7 +55,7 @@ def cw_1D(y, *args):
 # Jacobian (ni + nm, ni + nm) used by fsolve to calculate the steady-state (LI) characteristic
 def Jac_cw_1D(y, *args):
 
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp = args
+    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo = args
 
     N = y[0 : ni]
     N = N[:, np.newaxis]
@@ -79,8 +79,8 @@ def Jac_cw_1D(y, *args):
 
     d11 = -(c_nst + c_diff) * diag_ni - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)   # (ni,ni)
     d12 = -(Ngain / Scompr**2).T                                                        # (ni,nm)
-    d21 = Gamma * beta * c_nst * col + Gamma * g0 * c_st[:, 0, :] * Sterm               # (nm,ni)
-    d22 = (-c_sp + Gamma * Ngain[:, 0] / Scompr**2) * diag_nm                          # (nm,nm)
+    d21 = Gam_z * beta * c_nst * col + Gam_z * g0 * c_st[:, 0, :] * Sterm               # (nm,ni)
+    d22 = (-c_olo + Gam_z * Ngain[:, 0] / Scompr**2) * diag_nm                          # (nm,nm)
 
     col1 = np.concatenate((d11,d21), 0)
     col2 = np.concatenate((d12,d22), 0)
@@ -92,7 +92,7 @@ def Jac_cw_1D(y, *args):
 # system of ODEs to be solved for dynamic response calculation using solve_ivp solver
 def solver_1D(t, y, *args):
 
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp = args 
+    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo = args 
     
     N = y[0 : ni, 0]
     N = N[:, np.newaxis]
@@ -107,17 +107,17 @@ def solver_1D(t, y, *args):
     Diff = c_diff * N                                       # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
           - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination
-    Rsp = c_sp * S                                        # optical losses and outcoupling term
+    Rolo = c_olo * S                                        # optical losses and outcoupling term
 
     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    dSdt = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
+    dSdt = -Rolo + Gam_z * beta * Rnst[0, :] + Gam_z * Rst[:, 0][:, np.newaxis]
     dNSdt = np.concatenate([dNdt, dSdt])
 
     return dNSdt
 
 
 # system of ODEs to be solved for dynamic response calculation using finite differences
-def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp): 
+def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo): 
     
     Na = np.matmul(c_act, Nto)                              # average carrier density over the active area
     g0 = gln * np.log((Na + 1) / Ntr) / (Na - Ntr)          # fitted time domain logarithmic gain factor
@@ -127,9 +127,9 @@ def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, G
     Diff = c_diff * Nto                                     # carrier diffusion
     Rst = g0 * (np.squeeze(np.matmul(c_st, Nto)) \
          - c_st[:, :, 0] * Ntr) * Sto / (1 + epsilon * Sto) # stimulated recombination
-    Rsp = c_sp * Sto                                      # optical losses and outcoupling term
+    Rolo = c_olo * Sto                                      # optical losses and outcoupling term
 
     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    dSdt = -Rsp + Gamma * beta * Rnst[0, :] + Gamma * Rst[:, 0][:, np.newaxis]
+    dSdt = -Rolo + Gam_z * beta * Rnst[0, :] + Gam_z * Rst[:, 0][:, np.newaxis]
     
     return dNdt, dSdt
