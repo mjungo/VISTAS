@@ -24,14 +24,17 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.special as ss
 import time
 
 from matplotlib import cm
 from numba import njit
 from scipy.optimize import fsolve
+from scipy.optimize import check_grad
+from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
+from scipy.special import jn
+from scipy.special import jn_zeros
 
 import VISTASmodels
 
@@ -95,12 +98,11 @@ def main():
     norm = np.trapz(irho * rho, rho, axis = 0) * 2 / r_cav**2
     irho = irho / norm
     # plt.plot(rho, irho)
-    # plt.show()
+    # plt.show() 
     
     
     # 4. current and time characteristics --------------------------------------------------------------
 
-    print()
     modformat = int(input('Step (0), single pulse (1), or large signal (2): '))
     tmax = float(input('  simulated time (ns): ')) * 1e-9
     tspan = [0, tmax]
@@ -144,15 +146,14 @@ def main():
 
     # 5. coefficient arrays ----------------------------------------------------------------------------
 
-    print()
     ni = int(input('Radial resolution (typically 7-20 terms): '))
 
     # carrier radial series expansion terms J0i = J0(gammai * rho / r_cav)
-    gammai = np.asarray(ss.jn_zeros(1, ni-1))   # scipy function that calculates the roots of the Bessel function
+    gammai = np.asarray(jn_zeros(1, ni-1))   # scipy function that calculates the roots of the Bessel function
     gammai = np.insert(gammai, 0, 0, axis = 0)    # prepend 0 root, not included by jn_zero
     gammai = gammai[:, np.newaxis]
     
-    J0i = ss.jn(0, gammai * rho.T / r_cav)    # bessel exansion terms J0i (ni of them)
+    J0i = jn(0, gammai * rho.T / r_cav)    # bessel exansion terms J0i (ni of them)
 
     # coefficients array for calculating the average carrier density Na over the active area Na
     c_act = np.zeros((1, ni))
@@ -161,17 +162,17 @@ def main():
 
     # coefficients array that captures the spatial overlap between current and carrier profiles
     c_inj = np.zeros((ni, 1))
-    c_inj = np.trapz(J0i.T * irho * rho, rho, axis = 0)    # (ni, )
-    c_inj = c_inj[:, np.newaxis]    # (ni, 1)
-    c_inj = c_inj * 2 * eta_i / q / V_cav / (r_cav * ss.jn(0, gammai))**2  # (ni, 1)
-
-    # coefficients array that captures the overlap between carrier expansion terms to model diffusion
-    c_diff = np.zeros((ni, 1))
-    c_diff = DN * (gammai / r_cav)**2     # (ni, 1)
+    c_inj = np.trapz(J0i.T * irho * rho, rho, axis = 0)                 # (ni, )
+    c_inj = c_inj[:, np.newaxis]                                        # (ni, 1)
+    c_inj = c_inj * 2 * eta_i / q / V_cav / (r_cav * jn(0, gammai))**2  # (ni, 1)
 
     # coefficients array that describes non-stimulated carrier recombination (= 1 / tau_N)
     c_nst = np.ones((1, 1))
     c_nst = c_nst / tau_N
+
+    # coefficients array that captures the overlap between carrier expansion terms to model diffusion
+    c_diff = np.zeros((ni, 1))
+    c_diff = DN * (gammai / r_cav)**2     # (ni, 1)
 
     # coefficients array that captures the overlap between carrier expansion terms and mode profiles
     c_st = np.zeros((nm, ni, ni))
@@ -180,50 +181,49 @@ def main():
             for j in range(ni):
                     prodTmp = J0i[j, :] * Ur[m, :] * J0i[i, :] * rho.reshape((-1,)) # reshape -> dim (nrho, )
                     prodTmp = prodTmp[:, np.newaxis]
-                    c_st[m, i, j] = 2 * vg / (r_cav * ss.jn(0, gammai[i]))**2 * np.trapz(prodTmp, rho, axis = 0)    
+                    c_st[m, i, j] = 2 * vg / (r_cav * jn(0, gammai[i]))**2 * np.trapz(prodTmp, rho, axis = 0)    
 
-    # coefficients array that describes photons spontaneous recombination (= 1 / tau_S)
-    
-    c_sp = np.ones((nm, 1)) # assymettry (e.g. different internal losses) may be introduced for each mode)
-    alpha_m = 1 / L * np.log(1 / np.sqrt(Rt * Rb));               # mirror losses
+    # coefficients array that describes optical losses and outcoupling (= 1 / tau_S)
+    c_sp = np.ones((nm, 1)) # assymettry (e.g. different internal losses) may be introduced for each mode
+    alpha_m = 1 / L * np.log(1 / np.sqrt(Rt * Rb));         # mirror losses
     c_sp = c_sp * vg * (alpha_m + alpha_int) 
     
-    F = (1 - Rt) / ((1 - Rt) + np.sqrt(Rt / Rb) * (1 - Rb))    # fraction of power emitted at the top facet
-    eta_opt = F * alpha_m / (alpha_int + alpha_m)                   # optical efficiency (eta_opt*eta_i=eta_d)  
-    S2P = V_cav * hvl / wl0 * eta_opt * c_sp / Gamma * 1e3  # convert photon density to optical power (nm, 1)
+    F = (1 - Rt) / ((1 - Rt) + np.sqrt(Rt / Rb) * (1 - Rb)) # fraction of power emitted at the top facet
+    eta_opt = F * alpha_m / (alpha_int + alpha_m)           # optical efficiency (eta_opt*eta_i=eta_d)  
+    S2P = V_cav * hvl / wl0 * eta_opt * c_sp / Gamma * 1e3 # convert photon density to optical power (nm, 1)
 
 
-    # 6.static solution --------------------------------------------------------------------------------
+    # 6. steady-state (LI) solution --------------------------------------------------------------------
 
     Imax = 10e-3                                # current range for LI characteristic
-    dI = 0.2e-3                                 # current steps (must be small enough to ensure convergence)
-    Icw = np.arange(0, Imax, dI)                  # current vector
+    dI = 0.1e-3                                 # current steps (must be small enough to ensure convergence)
+    Icw = np.arange(0, Imax, dI)                # current vector
     NScw = np.zeros((ni + nm, Icw.shape[0]))    # NS solution matrix (ni+nm, Imax / dI)
-    NScw[0:ni, 1] = (c_inj * Icw[1] / (c_nst + c_diff)).reshape((-1,))              # N-analytical solution (no Rst) for 2nd current step
-    NScw[ni:ni + nm, 1] = (Gamma * beta * c_nst * NScw[0, 1] / c_sp).reshape((-1,)) # S-analytical solution (no Rst) for 2nd current step
-    
+    NScw[0:ni, 1] = (c_inj * Icw[1] / (c_nst + c_diff)).reshape((-1,))  # N-analytical solution (Rst = 0) for 2nd current step
+    NScw[ni:ni + nm, 1] = np.maximum((Gamma * beta * c_nst * NScw[0, 1] / c_sp).reshape((-1,)), 0) # S-analytical solution (Rst = 0) for 2nd current step
+
     tcwSolverStart = time.time()    
-    for i in range(2, Icw.shape[0], 1): # sol@0: 0, sol@1: below-threshold analytical solution calculated above
+    for i in range(2, Icw.shape[0], 1): # sol@0: 0, sol@1: NScw[:, 1] -> calculated analytically above
         args = (ni, nm, c_act, c_inj, Icw[i], c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
-        NScw[:, i] = fsolve(VISTASmodels.cw_1D, NScw[:, i - 1], args = args)
+        NScw[:, i] = fsolve(VISTASmodels.cw_1D, NScw[:, i - 1], args = args, fprime = VISTASmodels.Jac_cw_1D)
     tcwSolverEnd = time.time()
 
     print()
     print(f'LI calculation: {np.round(tcwSolverEnd - tcwSolverStart, 3)}s')
     plotPower(Icw * 1e3, NScw[ni:,:], S2P, LPlm, xlabel = 'current (mA)')
 
-
+    
     # 7a.solution of system of ODEs using 'solve_ivp' --------------------------------------------------
 
     NS = np.zeros((ni + nm, 1))
     NSinit = np.zeros((ni + nm))
 
     It = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
-
     args = (ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gamma, beta, c_nst, c_sp)
-
+    
     tSolverStart = time.time()
-    sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval = teval, method = 'RK23', dense_output = True, vectorized = True, args = args)
+    sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval = teval, method = 'RK45', dense_output = True, vectorized = True, args = args)
+    #sol = odeint(VISTASmodels.solver_1D, NSinit, t = teval, args = args, tfirst = True, Dfun = VISTASmodels.Jac_cw_1D)
     tSolverEnd = time.time()
 
     print()
@@ -256,14 +256,14 @@ def main():
 
     # tFDEnd = time.time()
     
-    # subsample (smaller dtFD needed to ensure convergence, but too dense for post-processing)
-    NFD = NFD[:, ::int(dt/dtFD)]        
-    SFD = SFD[:, ::int(dt/dtFD)]
-    tevalFD = tevalFD[::int(dt/dtFD)]   # tevalFD = teval
+    # # subsample (smaller dtFD needed to ensure convergence, but too dense for post-processing)
+    # NFD = NFD[:, ::int(dt/dtFD)]        
+    # SFD = SFD[:, ::int(dt/dtFD)]
+    # tevalFD = tevalFD[::int(dt/dtFD)]   # tevalFD = teval
 
-    print()
-    print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
-    plotPower(tevalFD * 1e9, SFD, S2P, LPlm, xlabel = 'time (ns)')
+    # print()
+    # print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
+    # plotPower(tevalFD * 1e9, SFD, S2P, LPlm, xlabel = 'time (ns)')
 
 
 def plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig):
