@@ -34,8 +34,8 @@ def cw_1D(y, *args):
     S = y[ni : ni + nm]
     S = S[:, np.newaxis]
     
-    Na = np.matmul(c_act, N)                                # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na - Ntr)          # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
     #print(f'Na = {Na}; g0 = {g0}')
 
     Inj = c_inj * It                                        # current injection term
@@ -62,10 +62,10 @@ def Jac_cw_1D(y, *args):
     S = y[ni : ni + nm]
     S = S[:, np.newaxis]
 
-    Na = np.matmul(c_act, N)                              # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na - Ntr)        # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
     #print(f'Na = {Na}; g0 = {g0}')
-    
+
     diag_ni = np.zeros((ni, ni), int)
     np.fill_diagonal(diag_ni, 1)
     diag_nm = np.zeros((nm, nm), int)
@@ -84,23 +84,22 @@ def Jac_cw_1D(y, *args):
 
     col1 = np.concatenate((d11,d21), 0)
     col2 = np.concatenate((d12,d22), 0)
-    Jac = np.concatenate((col1, col2), 1)
-
-    return Jac
+    
+    return np.concatenate((col1, col2), 1)
 
 
 # system of ODEs to be solved for dynamic response calculation using solve_ivp solver
 def solver_1D(t, y, *args):
 
     ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo = args 
-    
+
     N = y[0 : ni, 0]
     N = N[:, np.newaxis]
     S = y[ni : ni + nm, 0]
     S = S[:, np.newaxis]
-    
-    Na = np.matmul(c_act, N)                                # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na - Ntr)          # fitted time domain logarithmic gain factor
+
+    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
 
     Inj = c_inj * It(t)                                     # current injection
     Rnst = c_nst * N                                        # non-stimulated carrier recombination
@@ -111,16 +110,15 @@ def solver_1D(t, y, *args):
 
     dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
     dSdt = -Rolo + Gam_z * beta * Rnst[0, :] + Gam_z * Rst[:, 0][:, np.newaxis]
-    dNSdt = np.concatenate([dNdt, dSdt])
-
-    return dNSdt
+    
+    return np.concatenate([dNdt, dSdt])
 
 
 # system of ODEs to be solved for dynamic response calculation using finite differences
 def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo): 
     
-    Na = np.matmul(c_act, Nto)                              # average carrier density over the active area
-    g0 = gln * np.log((Na + 1) / Ntr) / (Na - Ntr)          # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, Nto), 1)                        # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
 
     Inj = c_inj * It                                        # current injection
     Rnst = c_nst * Nto                                      # non-stimulated carrier recombination

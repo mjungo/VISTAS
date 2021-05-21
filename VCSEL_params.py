@@ -22,21 +22,18 @@
 # SOFTWARE.
 ##################################################################################
 
-import numpy as np
+import json
 
 def params():
 
     # cavity parameters ------------------------------------------------
 
     r_ox = 4.5e-4                           # oxide aperture radius (cm)
-    r_cav = 3 * r_ox                      # cavity radius (cm)
-    Leff = 1300e-7                          # effective cavity length (cm)
+    Leff = 1250e-7                          # effective cavity length (cm)
     nqw = 3                                 # number of quantum wells
     dqw = 8e-7                              # single QW thickness (cm)
     db = 40e-7                              # SCH thickness (cm)
-    t = 0.7e-6                              # oxide thickness (cm) 
-    V_cav = np.pi * r_cav**2 * nqw * dqw    # cavity volume (cm-3)
-    Gam_z = dqw * nqw / Leff                # longitudinal optical confinement factor   
+    #t = 0.7e-6                             # oxide thickness (cm)   
 
     # general physical parameters ---------------------------------------------
 
@@ -45,10 +42,10 @@ def params():
     ng = 4.2                                # group refractive index
     delta_n = .0008                         # equivalent fractional refractive index change dn
     Rt = .997                               # top mirror reflectivity
-    Rb = .995                               # top mirror reflectivity
-    alpha_i = 25                            # internal losses (cm-1)
+    Rb = .999                               # top mirror reflectivity
+    alpha_i = 20                            # internal losses (cm-1)
     tau_N = 1.6e-9                          # carrier-lifetime (s)
-    beta = 2e-4                             # spontaneous recombination coeff.
+    beta = 1e-3                             # spontaneous recombination coeff.
 
     # gain parameters ---------------------------------------------------------
 
@@ -64,7 +61,7 @@ def params():
     tau_cap = 45e-12                        # ambipolar diffusion time (s)
     eta_i = 0.9                             # current injection efficiency
     rs = .5e-4                              # current spreading coefficient (cm)
-    DN = 12                                 # ambipolar diffusion coeff. (cm2/s)
+    DN = 15                                 # ambipolar diffusion coeff. (cm2/s)
 
     # thermal parameters ------------------------------------------------------
 
@@ -105,13 +102,8 @@ def params():
     #R_ext = ((1-next)/(1+next))**2         # external power reflectance1
     rwg = 25e-4                             # fiber core radius (cm)
 
-    # finite differences parameters -------------------------------------------
 
-    nrho = 100                              # radial steps
-    nphi = 200                              # azimuthal steps
-
-    return  (r_ox, r_cav, Leff, V_cav, Gam_z, \
+    return  (r_ox, Leff, nqw, dqw, \
                 wl0, nc, ng, delta_n, Rt, Rb, alpha_i, tau_N, beta, \
                     gln, Ntr, epsilon, Gam_r, \
-                        eta_i, rs, DN, \
-                            nrho, nphi)
+                        eta_i, rs, DN)

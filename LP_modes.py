@@ -29,7 +29,7 @@ from scipy.optimize import fsolve
 from scipy.optimize import newton
 import warnings
 
-def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
+def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
 
     # STEP 1. calculate normalized cutoff frequencies and derive corresponding modes LPlm
     
@@ -41,7 +41,7 @@ def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
     lvec = ind[0].flatten('C')      # successive indices l and m flattened into vectors
     mvec = ind[1].flatten('C') + 1  # +1 to shift m (0 -> 1)
 
-    VC=np.zeros((lmax, mmax))       # matrix with Vcutoff values stored along dimensions l and m (NB. l starts at zero, m at one)
+    VC = np.zeros((lmax, mmax))       # matrix with Vcutoff values stored along dimensions l and m (NB. l starts at zero, m at one)
     VC[0, 1 : mmax + 1] = np.round(sp.special.jn_zeros(1, mmax - 1), 5) # for l=0, Vcutoff as roots of J1(V) = 0, 1:max(mvec)-1 to account for added zero root not outputed by jn_zeros
     for l in range(1, lmax):
         VC[l, :] = np.round(sp.special.jn_zeros(l - 1, mmax), 5)        # for l!=0, Vcutoff given by the roots of Jl-1(V) = 0
@@ -61,7 +61,6 @@ def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
 
     lvec = A[0, :].astype(int)
     mvec = A[1, :].astype(int)
-    Vcutoff = A[2, :]
       
 
     # STEP 2. Find roots u of dispersion equation, and format them into a 2D array along the axes l and m
@@ -78,7 +77,7 @@ def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
 
         # run fsolve with multiple starting estimates between 1 and V (NB. the solution u must be < V)
         for u0 in np.linspace(1, V.astype(int) + 2, (V.astype(int) + 2) * alpha):  # the parameter 10 multiplies the number of starting point, thus improving convergence
-            root, info, ier, mesg = fsolve(lambda u: eigenValLP(u, l), u0, full_output=True)
+            root, infodict, ier, msg = fsolve(lambda u: eigenValLP(u, l), u0, full_output=True)
             if ier == 1:
                 ul = np.append(ul, np.round(root, 5)) # rounding enables subsequent suppression of duplicates using unique function
 
@@ -98,7 +97,7 @@ def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
     warnings.filterwarnings('default', category=RuntimeWarning) # switches warnings back on
 
 
-    # STEP 3. COnstruct radial modal profiles based on roots found in step 2
+    # STEP 3. Construct radial modal profiles based on roots found in step 2
 
     ur = np.zeros((nm, nrho))                 # radial modal intensity
     r_boundary = np.argmax(rho >= r_core)
@@ -116,7 +115,7 @@ def LP_modes(wLength, nc, delta_n, r_core, r_tot, nrho, rho, alpha):
     # plt.legend(LPlm)
     # plt.show()
 
-    return(nm, lvec, LPlm, ur)
+    return nm, lvec, LPlm, ur
 
 
 # wLength = 858e-9

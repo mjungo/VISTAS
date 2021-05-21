@@ -27,12 +27,12 @@ import numpy as np
 import time
 
 from matplotlib import cm
-from numba import njit
-from scipy.optimize import fsolve
-from scipy.optimize import check_grad
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
+from scipy.optimize import fsolve
+from scipy.optimize import check_grad
+from scipy.signal import savgol_filter
 from scipy.special import jn
 from scipy.special import jn_zeros
 
@@ -42,33 +42,39 @@ from LP_modes import LP_modes
 from VCSEL_params import params
 
 def main():
-    
+
     # 1. key parameters --------------------------------------------------------------------------------
  
-    (r_act, r_cav, Leff, V_cav, Gam_z, \
+    (r_act, Leff, nqw, dqw, \
         wl0, nc, ng, delta_n, Rt, Rb, alpha_i, tau_N, beta, \
             gln, Ntr, epsilon, Gam_r, \
-                eta_i, rs, DN, \
-                    nrho, nphi) = params()
+                eta_i, rs, DN) = params()
 
-    q = 1.602e-19       # elementary charge [C]
-    h = 6.626e-34       # Planck constant [Js]
-    kB = 1.381e-23      # Boltzmann constant [J/K]
-    c0 = 2.998e8        # vacuum speed of light [m/s]
+    q = 1.602e-19                           # elementary charge [C]
+    h = 6.626e-34                           # Planck constant [Js]
+    #kB = 1.381e-23                          # Boltzmann constant [J/K]
+    c0 = 2.998e8                            # vacuum speed of light [m/s]
 
-    hvl = h * c0 * 1e9  # photon energy [J*m]
-    vg = 100 * c0 / ng  # group velocity [cm/s]
+    hvl = h * c0 * 1e9                      # photon energy [J*m]
+    vg = 100 * c0 / ng                      # group velocity [cm/s]
+
+    r_cav = 3 * r_act                       # optical field and carriers extend beyond the active layer, delimited by the oxide
+    V_cav = np.pi * r_cav**2 * nqw * dqw    # cavity volume (cm-3)
+    Gam_z = dqw * nqw / Leff                # longitudinal optical confinement factor 
+
+    nrho = 100                              # radial steps
+    nphi = 200                              # azimuthal steps
 
     rho = np.linspace(0, r_cav, nrho)
-    rho = rho[:, np.newaxis]    # np rank one array -> (1, nrho) vector
+    rho = rho[:, np.newaxis]                # np rank one array -> (1, nrho) vector
     phi = np.linspace(0, 2*np.pi, nphi)
-    phi = phi[:, np.newaxis]    # np rank one array -> (1, nphi) vector
+    phi = phi[:, np.newaxis]                # np rank one array -> (1, nphi) vector
 
  
     # 2. normalized modes intensity profiles -----------------------------------------------------------
 
     # mode amplitude profiles
-    nm, lvec, LPlm, ur = LP_modes(wl0 * 1e-9, nc, delta_n, r_act * 1e-2, r_cav * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
+    nm, lvec, LPlm, ur = LP_modes(wl0 * 1e-9, nc, delta_n, r_act * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
 
     # normalized intensity profiles
     Ur = np.square(ur)  # field amplitude -> intensity
@@ -98,60 +104,16 @@ def main():
     # plt.plot(rho, irho)
     # plt.show() 
     
-    
-    # 4. current and time characteristics --------------------------------------------------------------
 
-    modformat = int(input('Step (0), single pulse (1), or large signal (2): '))
-    tmax = float(input('  simulated time (ns): ')) * 1e-9
-    tspan = [0, tmax]
-    dt = 10e-12     # "reporting" timesteps (at which the solve_ivp is interpolated)
-    dtFD = 1e-12    # timesteps for the finite difference evaluation
-    teval = np.arange(0, tmax, dt)
-    tevalFD = np.arange(0, tmax, dtFD)
-    ct=len(teval)
-    ctFD=len(tevalFD)
-
-    It = np.ones((ct))      # used with solve_ivp solver (t_eval with typically 10ps timesteps)
-    itFD = np.ones((ctFD))  # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
-
-    if modformat == 0:
-        Ion = float(input('  DC current (mA): ')) * 1e-3
-        It = It * Ion
-        itFD = itFD * Ion
-
-    elif modformat == 1:
-        Ion = float(input('  "on" current (mA): ')) * 1e-3
-        Ioff = float(input('  "off" current (mA): ')) * 1e-3
-        It = It * Ion
-        It[int(ct/2):] = Ioff
-        itFD = itFD * Ion
-        itFD[int(ctFD/2):] = Ioff
-
-    elif modformat == 2:
-        Ion = float(input('  "on" current (mA): ')) * 1e-3
-        Ioff = float(input('  "off" current (mA): ')) * 1e-3
-        tb=float(input('  single bit duration (ns): ')) * 1e-9
-        nb = int(tmax / tb)    # number of bits
-        sequence = np.random.randint(2, size = nb)
-        cb = int(tb / dt)                # number of time steps for one bit
-        cbFD = int(tb / dtFD)
-        It = It * Ion
-        itFD = itFD * Ion
-        for i in range(nb):
-            It[i * cb : (i + 1) * cb] = It[i * cb : (i + 1) * cb] - (Ion - Ioff) * sequence[i]
-            itFD[i * cbFD : (i + 1) * cbFD] = itFD[i * cbFD : (i + 1) * cbFD] - (Ion - Ioff) * sequence[i]
-
-
-    # 5. coefficient arrays ----------------------------------------------------------------------------
+    # 4. coefficient arrays ----------------------------------------------------------------------------
 
     ni = int(input('Radial resolution (typically 7-20 terms): '))
 
     # carrier radial series expansion terms J0i = J0(gammai * rho / r_cav)
-    gammai = np.asarray(jn_zeros(1, ni-1))   # scipy function that calculates the roots of the Bessel function
-    gammai = np.insert(gammai, 0, 0, axis = 0)    # prepend 0 root, not included by jn_zero
+    gammai = np.asarray(jn_zeros(1, ni-1))      # scipy function that calculates the roots of the Bessel function
+    gammai = np.insert(gammai, 0, 0, axis = 0)  # prepend 0 root, not included by jn_zero
     gammai = gammai[:, np.newaxis]
-    
-    J0i = jn(0, gammai * rho.T / r_cav)    # bessel exansion terms J0i (ni of them)
+    J0i = jn(0, gammai * rho.T / r_cav)         # bessel expansion terms J0i (ni of them)
 
     # coefficients array for calculating the average carrier density Na over the active area Na
     c_act = np.zeros((1, ni))
@@ -191,6 +153,93 @@ def main():
     S2P = eta_opt * hvl / wl0 * V_cav * c_olo / Gam_z * 1e3 # conversion factor photon density -> optical power (nm, 1)
     
     
+    # 5. current and time characteristics --------------------------------------------------------------
+
+    modFormat = int(input('Step (0), single pulse (1), random bits (2) or small signal (3): '))
+    
+    dt = 10e-12     # "reporting" timesteps (at which the solve_ivp is interpolated)
+    dtFD = 1e-12    # timesteps for the finite difference evaluation
+
+    if modFormat == 0:
+        tmax = float(input('  simulated time (ns): ')) * 1e-9
+        teval = np.arange(0, tmax, dt)
+        tevalFD = np.arange(0, tmax, dtFD)
+        ct = len(teval)
+        ctFD = len(tevalFD)
+
+        It = np.ones((ct))      # used with solve_ivp solver (t_eval with typically 10ps timesteps)
+        ItFD = np.ones((ctFD))  # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
+
+        Ion = float(input('  "on" current (mA): ')) * 1e-3        
+        It = It * Ion
+        It[0] = 0   # to calculate NSinit@I(t0)=0
+        ItFD = ItFD * Ion
+        ItFD[0] = 0 # to calculate NSinit@I(t0)=0
+
+    elif modFormat == 1:
+        tmax = float(input('  simulated time (ns): ')) * 1e-9
+        teval = np.arange(0, tmax, dt)
+        tevalFD = np.arange(0, tmax, dtFD)
+        ct = len(teval)
+        ctFD = len(tevalFD)
+        
+        It = np.ones((ct))      # used with solve_ivp solver (t_eval with typically 10ps timesteps) 
+        ItFD = np.ones((ctFD))  # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
+
+        Ion = float(input('  "on" current (mA): ')) * 1e-3
+        Ioff = float(input('  "off" current (mA): ')) * 1e-3
+        It = It * Ion
+        It[int(ct/2):] = Ioff
+        It[0] = 0   # to compute NSinit@I(t0)=0
+        ItFD = ItFD * Ion
+        ItFD[int(ctFD/2):] = Ioff
+        ItFD[0] = 0 # to compute NSinit@I(t0)=0
+
+    elif modFormat == 2:
+        tmax = float(input('  simulated time (ns): ')) * 1e-9
+        teval = np.arange(0, tmax, dt)
+        tevalFD = np.arange(0, tmax, dtFD)
+        ct = len(teval)
+        ctFD = len(tevalFD)
+
+        It = np.ones((ct))      # used with solve_ivp solver (t_eval with typically 10ps timesteps)
+        ItFD = np.ones((ctFD))  # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
+        
+        Ion = float(input('  "on" current (mA): ')) * 1e-3
+        Ioff = float(input('  "off" current (mA): ')) * 1e-3
+        tb = float(input('  single bit duration (ns): ')) * 1e-9
+        nb = int(tmax / tb)    # number of bits
+        sequence = np.random.randint(2, size = nb)
+        cb = int(tb / dt)                # number of time steps for one bit
+        cbFD = int(tb / dtFD)
+        It = It * Ion
+        ItFD = ItFD * Ion
+        for i in range(nb):
+            It[i * cb : (i + 1) * cb] = It[i * cb : (i + 1) * cb] - (Ion - Ioff) * sequence[i]
+            ItFD[i * cbFD : (i + 1) * cbFD] = ItFD[i * cbFD : (i + 1) * cbFD] - (Ion - Ioff) * sequence[i]
+
+    elif modFormat == 3:
+        
+        ct = 2**13 + 1     # 8192 points -> df = 1/dt/ct = 1/tmax = 12 MHz (for dt = 1ps)
+        tmax = ct * dt
+        teval = np.arange(0, tmax, dt)
+        
+        ctFD = 2**13 + 1     # 8192 points -> df = 1/dt/ct = 1/tmax = 12 MHz (for dt = 1ps)
+        tmaxFD = ctFD * dtFD
+        tevalFD = np.arange(0, tmaxFD, dtFD)
+        
+        Ion = float(input('  bias current (mA): ')) * 1e-3
+        Iss = float(input('  small current step (mA): ')) * 1e-3
+
+        It = np.ones((ct))      # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
+        It = It * (Ion + Iss)
+        It[0] = Ion             # to compute NSinit@I(t0)=Ion
+
+        ItFD = np.ones((ctFD))  # used with Finite Differences (FD) solver (t_eval with typically 1ps timesteps)
+        ItFD = ItFD * (Ion + Iss)
+        ItFD[0] = Ion           # to compute NSinit@I(t0)=Ion
+
+
     # 6. steady-state (LI) solution --------------------------------------------------------------------
 
     Imax = 10e-3                                # current range for LI characteristic
@@ -206,6 +255,8 @@ def main():
         NScw[:, i] = fsolve(VISTASmodels.cw_1D, NScw[:, i - 1], args = args, fprime = VISTASmodels.Jac_cw_1D)
     tcwSolverEnd = time.time()
 
+    NScwInterp = interp1d(x = Icw, y = NScw, fill_value = "extrapolate")    # extrapolates the LI characteristic -> NScwInterp(I)
+
     print()
     print(f'LI calculation: {np.round(tcwSolverEnd - tcwSolverStart, 3)}s')
     plotPower(Icw * 1e3, NScw[ni:,:], S2P, LPlm, xlabel = 'current (mA)')
@@ -213,14 +264,13 @@ def main():
     
     # 7a.solution of system of ODEs using 'solve_ivp' --------------------------------------------------
 
-    NS = np.zeros((ni + nm, 1))
-    NSinit = np.zeros((ni + nm))
+    NSinit = NScwInterp(It[0])   # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
 
     It = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
     args = (ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo)
     
     tSolverStart = time.time()
-    sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval = teval, method = 'RK45', dense_output = True, vectorized = True, args = args)
+    sol = solve_ivp(VISTASmodels.solver_1D, (0, tmax), NSinit, t_eval=teval, method='RK23', dense_output=True, vectorized=True, args=args, rtol=1e-8, atol=1e-6)
     #sol = odeint(VISTASmodels.solver_1D, NSinit, t = teval, args = args, tfirst = True, Dfun = VISTASmodels.Jac_cw_1D)
     tSolverEnd = time.time()
 
@@ -228,15 +278,23 @@ def main():
     print(f'Solve_ivp main loop: {np.round(tSolverEnd - tSolverStart, 3)}s')
     plotPower(sol.t * 1e9, sol.y[ni:ni+nm], S2P, LPlm, xlabel = 'time (ns)')
 
+    if modFormat == 3:
+        f, H = freqResp(sol.y[ni:ni+nm,1:], S2P, ct-1, dt)
+        plotH(f, H)   # frequency response
 
-    # 7b. solution of system of ODEs using finite differences ------------------------------------------
 
-    # NFD = np.zeros((ni, ctFD))  # N0, N1, ..., NnN
-    # Na = np.zeros((1, ctFD))    # average carrier density across the active area
-    # SFD = np.zeros((nm, ctFD))  # multimode photon number matrix
+    # 7b. solution of system of ODEs using finite differences with constant time-step ------------------
 
-    # Nto = np.zeros((ni, 1))
-    # Sto = np.zeros((nm, 1))
+    # NFD = np.zeros((ni, ctFD))      # N0, N1, ..., NnN
+    # SFD = np.zeros((nm, ctFD))      # multimode photon number matrix
+
+    # Nto = np.zeros((ni, 1))         # temp variable for passed to FD calculation function
+    # Sto = np.zeros((nm, 1))         # temp variable for passed to FD calculation function
+
+    # NSinit = NScwInterp(ItFD[0])    # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
+    # NFD[:, 0] = NSinit[:ni]
+    # SFD[:, 0] = NSinit[ni:]
+
     
     # tFDStart = time.time()
     
@@ -244,7 +302,7 @@ def main():
     #     Nto[:, 0] = NFD[:, ti]
     #     Sto[:, 0] = SFD[:, ti]
 
-    #     dNdt, dSdt = VISTASmodels.FD_1D(Nto, Sto, ni, nm, c_act, c_inj, itFD[ti], c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo) # rhs of system of ODEs
+    #     dNdt, dSdt = VISTASmodels.FD_1D(Nto, Sto, ni, nm, c_act, c_inj, ItFD[ti], c_diff, gln, c_st, Ntr, epsilon, Gam_z, beta, c_nst, c_olo) # rhs of system of ODEs
 
     #     Ntn = Nto + dtFD * dNdt             # Finite Differences step
     #     NFD[:, ti + 1] = Ntn.reshape((-1,))
@@ -254,7 +312,10 @@ def main():
 
     # tFDEnd = time.time()
     
-    # # subsample (smaller dtFD needed to ensure convergence, but too dense for post-processing)
+    # if modFormat == 3:
+    #     f, H = freqResp(SFD[:,1:], S2P, ctFD-1, dtFD)     # frequency response
+
+    # # subsampling (smaller dtFD needed to ensure convergence, but too dense for post-processing)
     # NFD = NFD[:, ::int(dt/dtFD)]        
     # SFD = SFD[:, ::int(dt/dtFD)]
     # tevalFD = tevalFD[::int(dt/dtFD)]   # tevalFD = teval
@@ -262,6 +323,9 @@ def main():
     # print()
     # print(f'FD solution main loop: {np.round(tFDEnd - tFDStart, 3)}s')
     # plotPower(tevalFD * 1e9, SFD, S2P, LPlm, xlabel = 'time (ns)')
+    
+    # if modFormat == 3:
+    #     plotH(f, H)     # frequency response
 
 
 def plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig):
@@ -278,7 +342,7 @@ def plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig):
     Uc, Us = UPc * UR, UPs * UR
 
     # transform mesh into cartesian coordinates
-    X, Y = R*np.cos(P), R*np.sin(P)
+    X, Y = R * np.cos(P), R * np.sin(P)
 
     # plot normalized intensity profiles
     for m in range(nm):
@@ -294,6 +358,7 @@ def plot2D(Ur, LPlm, lvec, nm, rho, nrho, phi, nphi, nfig):
         ax1.set_ylabel('cavity y (um)')
         ax1.zaxis.set_visible(False)
         ax1.set_zticklabels([])
+        #plt.show(block = False)
         plt.show()
 
 
@@ -306,6 +371,41 @@ def plotPower(x, S, S2P, modes, xlabel):
     plt.ylim(ymin=0)
     plt.xlabel(xlabel)
     plt.ylabel('optical output power (mW)')
+    plt.grid()
+    plt.show()
+
+
+def freqResp(S, S2P, ct, dt):
+
+    # 0. frequency vector (GHz)
+    f = np.linspace(start=0, stop=int(1/2/dt), num=int(ct/2))*1e-9
+    # 1. response to small signal step
+    P = np.sum(S * S2P, 0)
+    # 2. derivative of unit step = impulse: H(f) = Y(f) = FFT(yimp(t))) = FFT(d/dt ystep(T)
+    dP = np.gradient(P, dt)    # dP = np.diff(P) / dt as alternative
+    # 3. FFT to transform to frequency domain (-> complex)
+    DP = np.fft.fft(dP)
+    # 4. two-sided -> one-sided -> multiply amplitude of first half by 2, discard the rest
+    DP = DP[:int(ct/2)] * 2
+    #DP[0] = DP[0]/2
+    # 5. compute amplitude as product of DP and its complex conjugate, normalize
+    H = DP * np.conj(DP) / ct
+    H = H / H[0]
+    # 6. convert do dB
+    H = 10 * np.log10(H)
+    # (7. optional: filter to remove artefacts, e.g. in case rtol is too large in solve_ivp)
+    #H = savgol_filter(H, window_length=(ct/2), polyorder=4, mode='mirror')
+
+    return f, H
+
+
+def plotH(f, H):
+
+    plt.plot(f, H)
+    plt.xlim(xmin=0, xmax=10)
+    plt.ylim(ymin=-10, ymax=15)
+    plt.xlabel("Frequency (GHz)")
+    plt.ylabel('Frequency response (dB)')
     plt.grid()
     plt.show()
 
