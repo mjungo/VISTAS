@@ -54,10 +54,12 @@ def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
 
     nm = A.shape[1]     # number of modes
 
-    LPlm = np.empty([nm], dtype = object)   # vector containing modes names as string elements
+    #LPlm = np.empty([nm], dtype = object)   # vector containing modes names as string elements
+    LPlm = []   # list
     for m in range(nm):
         #print(f"LP{A[0,m].astype(int)}{A[1,m].astype(int)}: {np.round(A[2,m],3)}")
-        LPlm[m] = (f"LP{A[0,m].astype(int)}{A[1,m].astype(int)}")
+        # LPlm[m] = (f"LP{A[0,m].astype(int)}{A[1,m].astype(int)}")
+        LPlm.append(f"LP{A[0,m].astype(int)}{A[1,m].astype(int)}")
 
     lvec = A[0, :].astype(int)
     mvec = A[1, :].astype(int)
@@ -111,19 +113,25 @@ def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
         else:
             print(f'no root found for mode LP{lvec[m]}{mvec[m]}')
 
-    # plt.plot(rho.T, ur.T) #plot field profiles
-    # plt.legend(LPlm)
-    # plt.show()
-
     return nm, lvec, LPlm, ur
 
 
-# wLength = 858e-9
-# r_core = 6e-6
-# r_tot = 2 * r_core
-# nc = 3.6
-# dn = .001
-# nrho = 100
-# rho = np.linspace(0, r_tot, nrho)
-# rho = rho[:, np.newaxis]    # np rank one array -> (1, nrho) vector
-# nm, lvec, LPlm, ur = LP_modes(wLength, nc, dn, r_core, r_tot, nrho, rho.T, alpha = 10)
+def main():
+    
+    wLength = 858e-9
+    r_core = 30e-6
+    nc = 3.6
+    dn = .001
+    nrho = 100
+    rho = np.linspace(0, 2.5*r_core, nrho)
+    rho = rho[:, np.newaxis]    # np rank one array -> (1, nrho) vector
+
+    nm, lvec, LPlm, ur = LP_modes(wLength, nc, dn, r_core, nrho, rho.T, alpha = 10)
+
+    plt.plot(rho, ur.T) #plot field profiles
+    plt.legend(LPlm)
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

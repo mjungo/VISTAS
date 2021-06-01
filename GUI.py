@@ -1,24 +1,32 @@
 import json
 import PySimpleGUI as sg
 
+from VISTAS1D import VISTAS1D
 
-# check the type and correct the unit (ns->s,) to make sure correct values are stored in the dictionaries sp and vp
+
+# GUI/params mgmt: check the type and correct the unit (ns->s, mA->A) to make sure correct values are stored in the dictionaries sp and vp
 def check_value(k, v):
-    if k in ['SCHTransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'storeN']:
+
+    if k in ['SCHTransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'storeN', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'eyeplot']:
         try:
             v = bool(v)
         except:
-            sg.popup('boolean expected')
+            sg.popup('Bool input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+
     elif k in ['odeSolver', 'modFormat', 'vcselDescr']:
         try:
             v = str(v)
         except:
-            sg.popup('str expected')
+            sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+
     elif k == 'ni':
         try:
             v = int(v)
         except:
-            sg.popup('int expected')
+            sg.popup('Integer input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
     else:
         try:
             v = float(v)
@@ -27,12 +35,13 @@ def check_value(k, v):
             elif k in ['Ion', 'Ioff', 'Iss']:       # converts mA to A
                 v = round(v * 1e-3, 5)
         except:
-            sg.popup('float expected')
+            sg.popup('Float input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
 
     return k, v
  
 
-# read file "file_name.json", convert to dictionary dict of dicts params, and split into individual dictionaries sp and vp
+# GUI/params mgmt: read file "file_name.json", convert to dictionary dict of dicts params, and split into individual dictionaries sp and vp
 def load_params(file_name):
     with open(file_name, 'r') as openfile:
         d = json.load(openfile)    # dictionary
@@ -40,14 +49,14 @@ def load_params(file_name):
     return d
 
 
-# aggregate dictionaries sp and vp into dict of dicts params, convert to json, and save to "file_name.json"
-def save_params(sp, vp, file_name):
-    params = {'simParams': sp, 'vcselParams': vp}    # dict of dict
+# GUI/params mgmt: aggregate dictionaries sp and vp into dict of dicts params, convert to json, and save to "file_name.json"
+def save_params(sp, vp, sr, file_name):
+    params = {'simParams': sp, 'vcselParams': vp, 'simResults': sr}    # dict of dict
     with open(file_name, 'w') as outfile:
         json.dump(params, outfile, indent=4)
 
 
-# update dictionaries sp and vp on event, check type, adjust units
+# GUI/params mgmt: update dictionaries sp and vp on event, check type, adjust units
 def update_dict(values, d):
     for k, v in d.items():             # update entire dictionary
         k, d[k] = check_value(k, values[k])
@@ -55,52 +64,62 @@ def update_dict(values, d):
     return d
 
 
-# disable elements not used for certain parameters
+# GUI/params mgmt: disable elements not used for certain combinations of parameters
 def disable_elements(window, values):
-    window['Noise'].Update(disabled = False)  
 
     # simulation parameters
     if values['odeSolver'] == 'Finite Diff.':
         window['dtFD'].Update(disabled = False)
     else:
         window['dtFD'].Update(disabled = True)
+
     # modulation pattern
-    if values['modFormat'] == 'random bits':
+    if values['modFormat'] == 'step':
+        window['tmax'].Update(disabled = False)
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)
+        window['eyeplot'].Update(disabled = True)
+        window['Hfplot'].Update(disabled = True)
+    
+    elif values['modFormat'] == 'pulse':
+        window['tmax'].Update(disabled = False)
+        window['Ioff'].Update(disabled = False)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)
+        window['eyeplot'].Update(disabled = True)
+        window['Hfplot'].Update(disabled = True)
+
+    elif values['modFormat'] == 'random bits':
+        window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = False)
-        window['eye'].Update(disabled = False)
-        window['MTF'].Update(disabled = True)
+        window['eyeplot'].Update(disabled = False)
+        window['Hfplot'].Update(disabled = True)
 
     elif values['modFormat'] == 'small signal':
+        window['tmax'].Update(disabled = True)
         window['Ioff'].Update(disabled = True)
         window['Iss'].Update(disabled = False)
         window['tb'].Update(disabled = True)
-        window['eye'].Update(disabled = True)
-        window['MTF'].Update(disabled = False)
-
-    else:
-        window['Ioff'].Update(disabled = False)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
-        window['eye'].Update(disabled = True)
-        window['MTF'].Update(disabled = True)
+        window['eyeplot'].Update(disabled = True)
+        window['Hfplot'].Update(disabled = False)
 
     # simulated effects
     if values['Noise'] == True and values['modFormat'] == 'step':
-        window['RIN'].Update(disabled = False)
+        window['RINplot'].Update(disabled = False)
     else:
-        window['RIN'].Update(disabled = True)
+        window['RINplot'].Update(disabled = True)
 
 
-
-# update gui (incl. disabling elements) after initializing or loading params file
+# GUI/params mgmt: update gui (incl. disabling elements) after initializing or loading params file
 def update_gui(window, values, sp, vp):
     for k, v in sp.items():             # update entire simParams dictionary
         if k in ['tmax', 'dt', 'dtFD', 'tb']:
-            values[k] = sp[k]*1e9 # convert s to ns
+            values[k] = sp[k] * 1e9     # convert s to ns
         elif k in ['Ion', 'Ioff', 'Iss']:
-            values[k] = sp[k]*1e3 # convert A to mA
+            values[k] = sp[k] * 1e3     # convert A to mA
         else:
             values[k] = sp[k]
         window[k].update(values[k])
@@ -113,22 +132,21 @@ def update_gui(window, values, sp, vp):
     return values
 
 
-def main():
+# GUI/params mgmt: main function, incl. layout and events loop 
+def GUI():
 
     # 0. load last parameters into sp and vp dictionaries -------------------------------------------------------
-
     params = load_params('last_params.json')  # loads params file and populates dictionaries sp and vp
-    sp, vp = params['simParams'], params['vcselParams']
+    sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded (for that, chose "load params" and select any file but last_params.json or default_params.json)
+    sr = {}
     del params
 
     ttips = load_params('ttips.json')  # loads params file and populates dictionaries sp and vp
 
-
     # 1. Tabs layout -------------------------------------------------------
-
-    tab1_layout = [
+    spTab_layout = [
         [sg.Frame('Simulated effects',[
-            [sg.Checkbox('carrier transport into the quantum wells', key='SCHTransp', default=sp['SCHTransp'], size=(45,1), tooltip=ttips['SCHTransp'], enable_events=True)],
+            [sg.Checkbox('carrier transport into the quantum wells', key='SCHTransp', default=sp['SCHTransp'], size=(45,1), disabled=True, tooltip=ttips['SCHTransp'], enable_events=True)],
             [sg.Checkbox('thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
             [sg.Checkbox('noise', key='Noise', default=sp['Noise'], disabled=True, tooltip=ttips['Noise'], enable_events=True)],
             [sg.Checkbox('electrical parasitics', key='Parasitics', default=sp['Parasitics'], disabled=True, tooltip=ttips['Parasitics'], enable_events=True)],
@@ -138,29 +156,29 @@ def main():
             [sg.InputText(sp['ni'], key='ni', size=(7,1), tooltip=ttips['ni'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
             [sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
             [sg.Combo(values=('RK45', 'RK23', 'DOP853', 'Radau', 'LSODA', 'BDF', 'Finite Diff.'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
-            [sg.InputText(round(sp['tmax']*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True), sg.Text('simulated time (ns)')],
-            [sg.InputText(round(sp['dt']*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
-            [sg.InputText(round(sp['dtFD']*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=True, disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
+            [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['modFormat']=='small signal'), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
+            [sg.InputText(round(float(0 if sp['dt'] is None else sp['dt'])*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
+            [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
             ])],
         [sg.Frame('Current modulation pattern',[
             [sg.Combo(values=('step', 'pulse', 'random bits', 'small signal'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
-            [sg.InputText(round(sp['Ion']*1e3,1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
-            [sg.InputText(round(sp['Ioff']*1e3,1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
-            [sg.InputText(round(sp['Iss']*1e3,2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=True, disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
-            [sg.InputText(round(sp['tb']*1e9,1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, readonly=True, disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
+            [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3,1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
+            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3,1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']=='small signal' or sp['modFormat']=='step'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
+            [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3,2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
+            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9,1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
             ])],
-        [sg.Frame('Visualization',[
-            [sg.Checkbox('2D mode profiles', key='2Dmodes', default=sp['2Dmodes'], size=(45,1), tooltip=ttips['2Dmodes'], enable_events=True)],
-            [sg.Checkbox('Steady-state (LI) characteristic Popt(I)', key='LIplot', default=sp['LIplot'], size=(45,1), tooltip=ttips['LIplot'], enable_events=True)],
+        [sg.Frame('Results visualization',[
+            [sg.Checkbox('2D mode profiles', key='Uxyplot', default=sp['Uxyplot'], size=(45,1), tooltip=ttips['Uxyplot'], enable_events=True)],
+            [sg.Checkbox('Steady-state (LI) characteristic Popt(I)', key='PIplot', default=sp['PIplot'], size=(45,1), tooltip=ttips['PIplot'], enable_events=True)],
             [sg.Checkbox('Dynamic characteristic Popt(t)', key='Ptplot', default=sp['Ptplot'], tooltip=ttips['Ptplot'], enable_events=True)],
-            [sg.Checkbox('2D optical & carrier profiles within the cavity', key='2Dprofiles', disabled=True, default=sp['2Dprofiles'], size=(45,1), tooltip=ttips['2Dprofiles'], enable_events=True)],
-            [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RIN', default=sp['RIN'], disabled=True, tooltip=ttips['RIN'], enable_events=True)],
-            [sg.Checkbox('Modulation Transfer Function (MTF)', key='MTF', default=sp['MTF'], disabled=True, tooltip=ttips['MTF'], enable_events=True)],
-            [sg.Checkbox('Eye diagram', key='eye', default=sp['eye'], disabled=True, tooltip=ttips['eye'], enable_events=True)],
+            [sg.Checkbox('2D optical & carrier profiles within the cavity', key='NSxyplot', default=sp['NSxyplot'], disabled=True, size=(45,1), tooltip=ttips['NSxyplot'], enable_events=True)],
+            [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RINplot', default=sp['RINplot'], disabled=(sp['Noise']!=True), tooltip=ttips['RINplot'], enable_events=True)],
+            [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['modFormat']!='small signal'), tooltip=ttips['Hfplot'], enable_events=True)],
+            [sg.Checkbox('Eye diagram', key='eyeplot', default=sp['eyeplot'], disabled=(sp['modFormat']!='random bits'), tooltip=ttips['eyeplot'], enable_events=True)],
             ])],
         ]
 
-    tab2_layout = [
+    vpTab_layout = [
         [sg.Frame('Generic description',[
             [sg.Multiline(vp['vcselDescr'], key='vcselDescr', size=(52,2), tooltip=ttips['vcselDescr'], enable_events=True)],
             ])],
@@ -199,57 +217,63 @@ def main():
             ])],
         ]
 
-    tab1Col_layout = [[sg.Column(tab1_layout, size = (416,754), scrollable=True, vertical_scroll_only=True)]]
-    tab2Col_layout = [[sg.Column(tab2_layout, size = (416,754), scrollable=True, vertical_scroll_only=True)]]
+    spTabCol_layout = [[sg.Column(spTab_layout, size = (416,754), scrollable=True, vertical_scroll_only=True)]]
+    vpTabCol_layout = [[sg.Column(vpTab_layout, size = (416,754), scrollable=True, vertical_scroll_only=True)]]
 
-    layout = [[sg.TabGroup([[sg.Tab('Simulation parameters', tab1Col_layout), sg.Tab('VCSEL parameters', tab2Col_layout)]])],    
-            [sg.Button('initialize params', size=(12,1)), sg.Input(key='load file', enable_events=True, visible=False), sg.FileBrowse('load params', size=(12,1), file_types=(('JSON files', '*.json'),), target='load file'), sg.Input(key='save file', enable_events=True, visible=False), sg.SaveAs('save params as', size=(12,1), file_types=(('JSON files', '*.json'),), target='save file'), sg.Button('run simulation', size=(12,1))]]    
-
+    layout = [[sg.TabGroup([[sg.Tab('Simulation parameters', spTabCol_layout), sg.Tab('VCSEL parameters', vpTabCol_layout)]])],    
+            [sg.Button('initialize params', size=(12,1)), sg.Input(key='load file', enable_events=True, visible=False), sg.FileBrowse('load file', size=(12,1), file_types=(('JSON files', '*.json'),), target='load file'), sg.Input(key='save file', enable_events=True, visible=False), sg.SaveAs('save file', size=(12,1), file_types=(('JSON files', '*.json'),), target='save file'), sg.Button('run simulation', size=(12,1))]]
 
     # 2. window -------------------------------------------------------
-
     window = sg.Window('VISTAS', layout)
 
     # 3. events loop -------------------------------------------------------
-
     while True:
         
         event, values = window.read()
-        print(event)
+        #print(event)
 
         if event == sg.WIN_CLOSED:
-            save_params(sp, vp, 'last_params.json') # aggregates sp and vp in a dict of dicts and saves to a json file
+            save_params(sp, vp, {}, 'last_params.json')         # aggregates sp and vp in a dict of dicts and saves to a json file
             break
 
         elif event == 'initialize params':
-            params = load_params('default_params.json')  # loads params file and populates dictionaries sp and vp
-            sp, vp = params['simParams'], params['vcselParams']
+            params = load_params('default_params.json')         # loads params file and populates dictionaries sp and vp
+            sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded
+            sr = {}
             del params
-            save_params(sp, vp, 'last_params.json')
+            save_params(sp, vp, {}, 'last_params.json')         # simulation results not saved to "last_params.json"
             update_gui(window, values, sp, vp)
 
         elif event == 'load file':
             file_name = values['load file']
             if file_name != '':
-                params = load_params(file_name)  # loads params file and populates dictionaries sp and vp
-                sp, vp = params['simParams'], params['vcselParams']
+                params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
+                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']
+                # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, N, ur, etc.)
+                # for k, v in sr.items(): # extracts the dictionary items to variables named after the key
+                #     exec("%s = %d" % (k, v))
+                #     exec("%s = ['%s']" % (k, v))
                 del params
                 update_gui(window, values, sp, vp)   
 
         elif event == 'save file':
             file_name = values['save file']
             if file_name == '': file_name = 'last_params.json'
-            save_params(sp, vp, file_name) # aggregates sp and vp in a dict of dicts and saves to a json file
+            save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
 
         elif event == 'run simulation':
-            print('RUN')
-            save_params(sp, vp, 'last_params.json') # aggregates sp and vp in a dict of dicts and saves to a json file
-            break
+            save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
+            sr = VISTAS1D(sp, vp)
 
         else:   # case 'gui-element change'
             sp = update_dict(values, sp)        # update dictionary
             vp = update_dict(values, vp)        # update dictionary
             disable_elements(window, values)    # update GUI
+
+
+def main():
+    GUI()
+
 
 if __name__ == "__main__":
     main()

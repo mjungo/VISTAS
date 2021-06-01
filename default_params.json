@@ -8,25 +8,25 @@
         "ni": 15,
         "storeN": true,
         "odeSolver": "RK45",
-        "tmax": 100e-9,
+        "tmax": 10e-9,
         "dt": 1e-11,
         "dtFD": 1e-12,
         "modFormat": "step",
-        "Ion": 0.006,
-        "Ioff": 0.003,
+        "Ion": 0.005,
+        "Ioff": 0.002,
         "Iss": 0.0001,
         "tb": 5e-10,
-        "2Dmodes": true,
-        "LIplot": true,
+        "Uxyplot": false,
+        "PIplot": true,
         "Ptplot": true,
-        "2Dprofiles": true,
-        "RIN": true,
-        "MTF": true,
-        "eye": true
+        "NSxyplot": true,
+        "RINplot": true,
+        "Hfplot": true,
+        "eyeplot": true
     },
     "vcselParams": {
-        "vcselDescr": "free text\n",
-        "r_ox": 4.5e-4,
+        "vcselDescr": "free text",
+        "r_ox": 5e-4,
         "Leff": 1.3e-4,
         "nqw": 3,
         "dqw": 8e-07,
@@ -49,5 +49,6 @@
         "eta_i": 0.9,
         "rs": 5e-05,
         "DN": 12
-    }
+    },
+    "simResults": {}
 }
