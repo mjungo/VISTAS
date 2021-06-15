@@ -26,14 +26,13 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
-from scipy.optimize import newton
 import warnings
 
-def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
+def LP_modes(wLength, nc, dn, rCore, nrho, rho, alpha):
 
     # STEP 1. calculate normalized cutoff frequencies and derive corresponding modes LPlm
     
-    V = 2 * np.pi * r_core / wLength * nc * np.sqrt(2 * delta_n)    # normalized frequency for the specified waveguide
+    V = 2 * np.pi * rCore / wLength * nc * np.sqrt(2 * dn)    # normalized frequency for the specified waveguide
 
     lmax = 100
     mmax = 50
@@ -102,14 +101,14 @@ def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
     # STEP 3. Construct radial modal profiles based on roots found in step 2
 
     ur = np.zeros((nm, nrho))                 # radial modal intensity
-    r_boundary = np.argmax(rho >= r_core)
+    rBoundary = np.argmax(rho >= rCore)
 
     for m in range(nm):
         um = u[lvec[m], mvec[m]]
         if um != 0:
             wm = np.sqrt(V**2 - um**2)
-            ur[m, :r_boundary] = sp.special.jv(lvec[m], um * rho[:, :r_boundary] / r_core) / sp.special.jv(lvec[m], um)   # profile in core
-            ur[m, r_boundary:] = sp.special.kv(lvec[m], wm * rho[:, r_boundary:] / r_core) / sp.special.kv(lvec[m], wm)   # profile in cladding
+            ur[m, :rBoundary] = sp.special.jv(lvec[m], um * rho[:, :rBoundary] / rCore) / sp.special.jv(lvec[m], um)   # profile in core
+            ur[m, rBoundary:] = sp.special.kv(lvec[m], wm * rho[:, rBoundary:] / rCore) / sp.special.kv(lvec[m], wm)   # profile in cladding
         else:
             print(f'no root found for mode LP{lvec[m]}{mvec[m]}')
 
@@ -119,14 +118,14 @@ def LP_modes(wLength, nc, delta_n, r_core, nrho, rho, alpha):
 def main():
     
     wLength = 858e-9
-    r_core = 30e-6
+    rCore = 8e-6
     nc = 3.6
     dn = .001
     nrho = 100
-    rho = np.linspace(0, 2.5*r_core, nrho)
+    rho = np.linspace(0, 2.5*rCore, nrho)
     rho = rho[:, np.newaxis]    # np rank one array -> (1, nrho) vector
 
-    nm, lvec, LPlm, ur = LP_modes(wLength, nc, dn, r_core, nrho, rho.T, alpha = 10)
+    nm, lvec, LPlm, ur = LP_modes(wLength, nc, dn, rCore, nrho, rho.T, alpha = 10)
 
     plt.plot(rho, ur.T) #plot field profiles
     plt.legend(LPlm)

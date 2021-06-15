@@ -97,9 +97,8 @@ def plotEye(teval, dt, tb, P):
     tplot = np.linspace(0, 2*tb, 2*ctb)
     #tplot = np.arange(0, 2*tb, dt)
     for i in range(1, nb-1):
-        print(i)
         plt.plot(tplot, P[int((i-0.5)*ctb):int((i+1.5)*ctb)], 'b')  # displays 2 bit lengths, from -0.5 to 1.5 * tb
     plt.title(str(nb) + ' periods')
-    plt.xlabel('time (ns)')
     plt.ylabel('optical output power (mW)')
+    plt.xlabel('time (ns)')
     plt.show()

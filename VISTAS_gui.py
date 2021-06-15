@@ -1,3 +1,27 @@
+##################################################################################
+# MIT License
+#
+# Copyright (c) 2021 Marc Jungo
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+##################################################################################
+
 import json
 import PySimpleGUI as sg
 
@@ -184,7 +208,7 @@ def GUI():
             [sg.Multiline(vp['vcselDescr'], key='vcselDescr', size=(52,2), tooltip=ttips['vcselDescr'], enable_events=True)],
             ])],
         [sg.Frame('Cavity geometry parameters',[
-            [sg.InputText(vp['r_ox'], key='r_ox', size=(7,1), tooltip=ttips['r_ox'], enable_events=True), sg.Text('r_ox: oxide aperture radius (cm)', size=(40,1))],
+            [sg.InputText(vp['rOx'], key='rOx', size=(7,1), tooltip=ttips['rOx'], enable_events=True), sg.Text('rOx: oxide aperture radius (cm)', size=(40,1))],
             [sg.InputText(vp['Leff'], key='Leff', size=(7,1), tooltip=ttips['Leff'], enable_events=True), sg.Text('Leff: effective cavity length (cm)')],
             [sg.InputText(vp['nqw'], key='nqw', size=(7,1), tooltip=ttips['nqw'], enable_events=True), sg.Text('nqw: number of quantum wells')],
             [sg.InputText(vp['dqw'], key='dqw', size=(7,1), tooltip=ttips['dqw'], enable_events=True), sg.Text('dqw: single QW thickness (cm)')],
@@ -194,26 +218,26 @@ def GUI():
             [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nm)', size=(40,1))],
             [sg.InputText(vp['nc'], key='nc', size=(7,1), tooltip=ttips['nc'], enable_events=True), sg.Text('nc: core equivalent refractive index')],
             [sg.InputText(vp['ng'], key='ng', size=(7,1), tooltip=ttips['ng'], enable_events=True), sg.Text('ng: group refractive index')],
-            [sg.InputText(vp['delta_n'], key='delta_n', size=(7,1), tooltip=ttips['delta_n'], enable_events=True), sg.Text('delta_n: equivalent fractional refractive index change')],
+            [sg.InputText(vp['dn'], key='dn', size=(7,1), tooltip=ttips['dn'], enable_events=True), sg.Text('dn: equivalent fractional refractive index change')],
             ])],
         [sg.Frame('Optical parameters',[
             [sg.InputText(vp['Rt'], key='Rt', size=(7,1), tooltip=ttips['Rt'], enable_events=True), sg.Text('Rt: top mirror reflectivity', size=(40,1))],
             [sg.InputText(vp['Rb'], key='Rb', size=(7,1), tooltip=ttips['Rb'], enable_events=True), sg.Text('Rb: bottom mirror reflectivity')],
-            [sg.InputText(vp['alpha_i'], key='alpha_i', size=(7,1), tooltip=ttips['alpha_i'], enable_events=True), sg.Text('alpha_i: internal losses (cm-1)')],
+            [sg.InputText(vp['alphai'], key='alphai', size=(7,1), tooltip=ttips['alphai'], enable_events=True), sg.Text('alphai: internal losses (cm-1)')],
             [sg.InputText(vp['beta'], key='beta', size=(7,1), tooltip=ttips['beta'], enable_events=True), sg.Text('beta: spontaneous recombination coefficient')],
             ])],
         [sg.Frame('Gain parameters',[
             [sg.InputText(vp['gln'], key='gln', size=(7,1), tooltip=ttips['gln'], enable_events=True), sg.Text('gln: logarithmic gain coefficient (cm-1)', size=(40,1))],
             [sg.InputText(vp['Ntr'], key='Ntr', size=(7,1), tooltip=ttips['Ntr'], enable_events=True), sg.Text('Ntr: transparency carrier density (cm-3)')],
             [sg.InputText(vp['epsilon'], key='epsilon', size=(7,1), tooltip=ttips['epsilon'], enable_events=True), sg.Text('epsilon: gain compression factor')],
-            [sg.InputText(vp['Gam_r'], key='Gam_r', size=(7,1), tooltip=ttips['Gam_r'], enable_events=True), sg.Text('Gam_r: relative confinement factor')],
+            [sg.InputText(vp['GamR'], key='GamR', size=(7,1), tooltip=ttips['GamR'], enable_events=True), sg.Text('GamR: relative confinement factor')],
             ])],
         [sg.Frame('Carrier transport and diffusion parameters',[
             [sg.InputText(vp['tauNb'], key='tauNb', size=(7,1), tooltip=ttips['tauNb'], enable_events=True), sg.Text('tauNb: carrier lifetime in the barriers (s)', size=(40,1))],
             [sg.InputText(vp['tauN'], key='tauN', size=(7,1), tooltip=ttips['tauN'], enable_events=True), sg.Text('tauN: carrier lifetime in the QWs (s)', size=(40,1))],
             [sg.InputText(vp['tauCap'], key='tauCap', size=(7,1), tooltip=ttips['tauCap'], enable_events=True), sg.Text('tauCap: ambipolar diffusion time (s)')],
             [sg.InputText(vp['tauEsc'], key='tauEsc', size=(7,1), tooltip=ttips['tauEsc'], enable_events=True), sg.Text('tauEsc: thermionic emission lifetime (s)', size=(40,1))],
-            [sg.InputText(vp['eta_i'], key='eta_i', size=(7,1), tooltip=ttips['eta_i'], enable_events=True), sg.Text('eta_i: current injection efficiency')],
+            [sg.InputText(vp['etaI'], key='etaI', size=(7,1), tooltip=ttips['etaI'], enable_events=True), sg.Text('etaI: current injection efficiency')],
             [sg.InputText(vp['rs'], key='rs', size=(7,1), tooltip=ttips['rs'], enable_events=True), sg.Text('rs: current spreading coefficient (cm)')],
             [sg.InputText(vp['DN'], key='DN', size=(7,1), tooltip=ttips['DN'], enable_events=True), sg.Text('DN: ambipolar diffusion coeff. (cm2/s)')],
             ])],
@@ -241,7 +265,10 @@ def GUI():
         elif event == 'initialize params':
             if 'S' in locals():
                 del rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
-            del sp, vp, sr
+            if 'sr' in locals():    
+                del sp, vp, sr
+            else:
+                del sp, vp
             params = load_params('default_params.json')         # loads params file and populates dictionaries sp and vp
             sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded
             del params
@@ -251,7 +278,10 @@ def GUI():
         elif event == 'load file':
             if 'S' in locals():
                 del rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
-            del sp, vp, sr
+            if 'sr' in locals():    
+                del sp, vp, sr
+            else:
+                del sp, vp
             file_name = values['load file']
             if file_name != '':
                 params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
@@ -286,7 +316,7 @@ def GUI():
                 }
             if file_name == '': file_name = 'last_params.json'
             save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
-            sr = {}
+            del sr
 
         elif event == 'run simulation':
             save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
