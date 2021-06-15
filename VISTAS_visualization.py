@@ -94,7 +94,8 @@ def plotEye(teval, dt, tb, P):
     tmax = max(teval)
     ctb = int(tb / dt)   # number of time steps for one "bit"
     nb = int(tmax / tb)
-    tplot = np.arange(0, 2*tb, dt)
+    tplot = np.linspace(0, 2*tb, 2*ctb)
+    #tplot = np.arange(0, 2*tb, dt)
     for i in range(1, nb-1):
         print(i)
         plt.plot(tplot, P[int((i-0.5)*ctb):int((i+1.5)*ctb)], 'b')  # displays 2 bit lengths, from -0.5 to 1.5 * tb
