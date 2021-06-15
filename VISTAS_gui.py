@@ -285,11 +285,7 @@ def GUI():
             file_name = values['load file']
             if file_name != '':
                 params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
-                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']
-                # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, N, ur, etc.)
-                # for k, v in sr.items(): # extracts the dictionary items to variables named after the key
-                #     exec("%s = %d" % (k, v))
-                #     exec("%s = ['%s']" % (k, v))
+                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, N, ur, etc.)
                 del params
                 update_gui(window, values, sp, vp)   
 
@@ -314,6 +310,8 @@ def GUI():
                     "N": N.tolist(),
                     "S": S.tolist(),
                 }
+            else:
+                sr = {}
             if file_name == '': file_name = 'last_params.json'
             save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
             del sr
