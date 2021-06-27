@@ -23,7 +23,6 @@
 ##################################################################################
 
 import json
-#import matplotlib.pyplot as plt
 import numpy as np
 import time
 
@@ -38,119 +37,213 @@ from scipy.special import jn_zeros
 
 from VISTAS_modes import LP_modes
 
-# system of equations to be solved for calculation of steady-state (LI) characteristic
-def cw_1D(y, *args): 
-    
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauN, tauS = args
 
-    N = y[0 : ni]
-    N = N[:, np.newaxis]
-    S = y[ni : ni + nm]
+# system of equations to be solved for calculation of steady-state (LI) characteristic
+def cw_1D_transp(y, *args): 
+    
+    SCHtransp, nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauNb, tauNw, tauCap, tauEsc, taub, tauw, tauS = args
+
+    Nb=y[0]
+    Nw = y[1:nNb+nNw]
+    Nw = Nw[:, np.newaxis]
+    S = y[nNb+nNw:]
     S = S[:, np.newaxis]
     
-    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
-    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, Nw), 1)                       # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
     #print(f'Na = {Na}; g0 = {g0}')
 
-    Inj = c_inj * It                                        # current injection term
-    Rnst = N / tauN                                         # non-stimulated carrier recombination
-    Diff = c_diff * N                                       # carrier diffusion term
-    Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
-          - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination term
+    Injb = c_injb * It                                      # current injection
+    
+    if SCHtransp == True:
+        Cap = Nb / tauCap                                   # carrier capture term from the barriers into the QWs
+        Esc = Nw / tauEsc                                   # carrier escape term from the QWs into the barriers
+        Rnstb = Nb / tauNb                                  # non-stimulated carrier recombination in the barriers
+    else:  
+        Cap = Injb                                          # carrier capture term from the barriers into the QWs
+        Esc = np.zeros((nNw, 1))                            # carrier escape term from the QWs into the barriers
+        Rnstb = 0                                           # non-stimulated carrier recombination in the barriers
+
+    Injw = c_injw / Vr * Cap                                # current injection into the wells
+    Rnstw = Nw / tauNw                                      # non-stimulated carrier recombination
+    Diff = c_diff * Nw                                      # carrier diffusion
+    Rst = g0 * (np.squeeze(np.matmul(c_st, Nw)) \
+          - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination
     Rolo = S / tauS                                         # optical losses and outcoupling term
 
-    Nsol = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    Ssol = -Rolo + GamZ * beta * Rnst[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
-    NSsol = np.concatenate([Nsol, Ssol])
+    Nbsol = Injb - Rnstb - Cap + Vr * Esc[0,:][:, np.newaxis]
+    Nwsol = Injw - Rnstw - Diff - Esc - np.sum(Rst, 0)[:, np.newaxis]
+    Ssol = -Rolo + GamZ * beta * Rnstw[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
+    NSsol = np.concatenate([Nbsol, Nwsol, Ssol])
     NSsol = NSsol.reshape((-1,))
 
     return NSsol
 
-# Jacobian (ni + nm, ni + nm) used by fsolve to calculate the steady-state (LI) characteristic
-def Jac_cw_1D(y, *args):
 
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauN, tauS = args
+# Jacobian (nNb+nNw+nS, nNb+nNw+nS) used by fsolve to calculate the steady-state (LI) characteristic
+def Jac_cw_1D_transp(y, *args):
 
-    N = y[0 : ni]
-    N = N[:, np.newaxis]
-    S = y[ni : ni + nm]
+    SCHtransp, nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauNb, tauNw, tauCap, tauEsc, taub, tauw, tauS = args
+
+    Nw = y[1:nNb+nNw]
+    Nw = Nw[:, np.newaxis]
+    S = y[nNb+nNw:]
     S = S[:, np.newaxis]
 
-    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
-    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, Nw), 1)                       # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
     #print(f'Na = {Na}; g0 = {g0}')
 
-    diag_ni = np.zeros((ni, ni), int)
-    np.fill_diagonal(diag_ni, 1)
-    diag_nm = np.zeros((nm, nm), int)
-    np.fill_diagonal(diag_nm, 1)
-    col = np.zeros((nm, ni))
-    col[:, 0] = 1
+    diag_nNw = np.zeros((nNw, nNw), int)
+    np.fill_diagonal(diag_nNw, 1)
+    diag_nS = np.zeros((nS, nS), int)
+    np.fill_diagonal(diag_nS, 1)
+    slice_nSnNw = np.zeros((nS, nNw))
+    slice_nSnNw[:, 0] = 1                                   # spontaneous emission proportional to Nw0 only (first column)
 
-    Ngain = g0 * (np.squeeze(np.matmul(c_st, N)) - c_st[:, :, 0] * Ntr)
+    Ngain = g0 * (np.squeeze(np.matmul(c_st, Nw)) - c_st[:, :, 0] * Ntr)
     Scompr = 1 + epsilon * S
     Sterm = S / Scompr
 
-    d11 = -(1 / tauN + c_diff) * diag_ni - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)   # (ni,ni)
-    d12 = -(Ngain / Scompr**2).T                                                        # (ni,nm)
-    d21 = GamZ * beta / tauN * col + GamZ * g0 * c_st[:, 0, :] * Sterm               # (nm,ni)
-    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nm                          # (nm,nm)
-
-    col1 = np.concatenate((d11,d21), 0)
-    col2 = np.concatenate((d12,d22), 0)
+    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                             # dfNb/dNb (1,  1)
+    d10 = c_injw / Vr / tauCap                                                              # dfNw/dNb (nNw,1)
+    d20 = np.zeros((nS, 1))                                                                 # dfS/dNb  (nS, 1)
     
-    return np.concatenate((col1, col2), 1)
+    d01 = np.zeros((1, nNw))                                                                # dfNb/dNw (1,  nNw)
+    d01[0, 0] = Vr / tauEsc
+    d11 = -(1/tauw + c_diff) * diag_nNw - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)     # dfNw/dNw (nNw,nNw)
+    d21 = GamZ * beta / tauNw * slice_nSnNw + GamZ * g0 * c_st[:, 0, :] * Sterm             # dfS/dNw  (nS, nNw)
+    
+    d02 = np.zeros((1, nS))                                                                 # dfNb/dS  (1,  nS)
+    d12 = -(Ngain / Scompr**2).T                                                            # dfNw/dS  (nNw,nS)
+    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                            # dfS/dS   (nS, nS)
+
+    col0 = np.concatenate((d00, d10, d20), 0)
+    col1 = np.concatenate((d01, d11, d21), 0)
+    col2 = np.concatenate((d02, d12, d22), 0)
+
+    return np.concatenate((col0, col1, col2), 1)
 
 
 # system of ODEs to be solved for dynamic response calculation using solve_ivp solver
-def solver_1D(t, y, *args):
+def ODEsolver_1D_transp(t, y, *args):
 
-    ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauN, tauS = args 
+    SCHtransp, nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauNb, tauNw, tauCap, tauEsc, taub, tauw, tauS = args
 
-    N = y[0 : ni, 0]
-    N = N[:, np.newaxis]
-    S = y[ni : ni + nm, 0]
+    Nb = y[0, 0]
+    Nw = y[1:nNb+nNw, 0]
+    Nw = Nw[:, np.newaxis]
+    S = y[nNb+nNw:, 0]
     S = S[:, np.newaxis]
 
-    Na = max(np.matmul(c_act, N), 1)                        # average carrier density over the active area
-    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, Nw), 1)                       # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
 
-    Inj = c_inj * It(t)                                     # current injection
-    Rnst = N / tauN                                         # non-stimulated carrier recombination
-    Diff = c_diff * N                                       # carrier diffusion
-    Rst = g0 * (np.squeeze(np.matmul(c_st, N)) \
+    Injb = c_injb * It(t)                                   # current injection
+    
+    if SCHtransp == True:
+        Cap = Nb / tauCap                                   # carrier capture term from the barriers into the QWs
+        Esc = Nw / tauEsc                                   # carrier escape term from the QWs into the barriers
+        Rnstb = Nb / tauNb                                  # non-stimulated carrier recombination in the barriers
+    else:  
+        Cap = Injb                                          # carrier capture term from the barriers into the QWs
+        Esc = np.zeros((nNw, 1))                             # carrier escape term from the QWs into the barriers
+        Rnstb = 0                                           # non-stimulated carrier recombination in the barriers
+
+    Injw = c_injw / Vr * Cap                                # current injection into the barriers
+    Rnstw = Nw / tauNw                                      # non-stimulated carrier recombination
+    Diff = c_diff * Nw                                      # carrier diffusion
+    Rst = g0 * (np.squeeze(np.matmul(c_st, Nw)) \
           - c_st[:, :, 0] * Ntr) * S / (1 + epsilon * S)    # stimulated recombination
     Rolo = S / tauS                                         # optical losses and outcoupling term
 
-    dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    dSdt = -Rolo + GamZ * beta * Rnst[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
+    dNbdt = Injb - Rnstb - Cap + Vr * Esc[0,:][:, np.newaxis]
+    dNwdt = Injw - Rnstw - Diff - Esc - np.sum(Rst, 0)[:, np.newaxis]
+    dSdt = -Rolo + GamZ * beta * Rnstw[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
     
-    return np.concatenate([dNdt, dSdt])
+    return np.concatenate([dNbdt, dNwdt, dSdt])
+
+
+# Jacobian (nNb+nNw+nS, nNb+nNw+nS) used by solve_ivp to calculate the dynamic response
+def Jac_1D_transp(t, y, *args):
+
+    SCHtransp, nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauNb, tauNw, tauCap, tauEsc, taub, tauw, tauS = args
+    
+
+    Nw = y[1:nNb+nNw]
+    Nw = Nw[:, np.newaxis]
+    S = y[nNb+nNw:]
+    S = S[:, np.newaxis]
+
+    Na = max(np.matmul(c_act, Nw), 1)                       # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
+    #print(f'Na = {Na}; g0 = {g0}')
+
+    diag_nNw = np.zeros((nNw, nNw), int)
+    np.fill_diagonal(diag_nNw, 1)
+    diag_nS = np.zeros((nS, nS), int)
+    np.fill_diagonal(diag_nS, 1)
+    slice_nNwnS = np.zeros((nS, nNw))
+    slice_nNwnS[:, 0] = 1                                   # spontaneous emission proportional to Nw0 only (first column)
+
+    Ngain = g0 * (np.squeeze(np.matmul(c_st, Nw)) - c_st[:, :, 0] * Ntr)
+    Scompr = 1 + epsilon * S
+    Sterm = S / Scompr
+
+    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                             # dfNb/dNb (1,  1)
+    d10 = c_injw / Vr / tauCap                                                              # dfNw/dNb (nNw,1)
+    d20 = np.zeros((nS, 1))                                                                 # dfS/dNb  (nS, 1)
+    
+    d01 = np.zeros((1, nNw))                                                                # dfNb/dNw (1,  nNw)
+    d01[0, 0] = Vr / tauEsc
+    d11 = -(1/tauw + c_diff) * diag_nNw - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)     # dfNw/dNw (nNw,nNw)
+    d21 = GamZ * beta / tauNw * slice_nNwnS + GamZ * g0 * c_st[:, 0, :] * Sterm             # dfS/dNw  (nS, nNw)
+    
+    d02 = np.zeros((1, nS))                                                                 # dfNb/dS  (1,  nS)
+    d12 = -(Ngain / Scompr**2).T                                                            # dfNw/dS  (nNw,nS)
+    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                            # dfS/dS   (nS, nS)
+
+    col0 = np.concatenate((d00, d10, d20), 0)
+    col1 = np.concatenate((d01, d11, d21), 0)
+    col2 = np.concatenate((d02, d12, d22), 0)
+
+    return np.concatenate((col0, col1, col2), 1)
 
 
 # system of ODEs to be solved for dynamic response calculation using finite differences
-def FD_1D(Nto, Sto, ni, nm, c_act, c_inj, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauN, tauS): 
+def FDsolver_1D_transp(SCHtransp, Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_injw, It, c_diff, gln, c_st, Ntr, epsilon, GamZ, beta, tauNb, tauNw, tauCap, tauEsc, tauS):
     
-    Na = max(np.matmul(c_act, Nto), 1)                        # average carrier density over the active area
-    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # fitted time domain logarithmic gain factor
+    Na = max(np.matmul(c_act, Nwto), 1)                     # average carrier density over the active area
+    g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
 
-    Inj = c_inj * It                                        # current injection
-    Rnst = Nto / tauN                                      # non-stimulated carrier recombination
-    Diff = c_diff * Nto                                     # carrier diffusion
-    Rst = g0 * (np.squeeze(np.matmul(c_st, Nto)) \
-         - c_st[:, :, 0] * Ntr) * Sto / (1 + epsilon * Sto) # stimulated recombination
-    Rolo = Sto / tauS                                      # optical losses and outcoupling term
+    Injb = c_injb * It                                      # current injection into the barriers
 
-    dNdt = Inj - Rnst - Diff - np.sum(Rst, 0)[:, np.newaxis]
-    dSdt = -Rolo + GamZ * beta * Rnst[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
+    if SCHtransp == True:
+        Cap = Nbto / tauCap                                 # carrier capture term from the barriers into the QWs   (1,  1)
+        Esc = Nwto / tauEsc                                 # carrier escape term from the QWs into the barriers    (nNw,1)
+        Rnstb = Nbto / tauNb                                # non-stimulated carrier recombination in the barriers  (1,  1)
+    else:  
+        Cap = Injb                                          # carrier capture term from the barriers into the QWs   (1,  1)
+        Esc = np.zeros((nNw, 1))                            # carrier escape term from the QWs into the barriers    (nNw,1)
+        Rnstb = 0                                           # non-stimulated carrier recombination in the barriers  (1,  1)
+        
+    Injw = c_injw / Vr * Cap                                # carrier injection into the QWs
+    Rnstw = Nwto / tauNw                                    # non-stimulated carrier recombination in the QWs
+    Diff = c_diff * Nwto                                    # carrier diffusion
+    Rst = g0 * (np.squeeze(np.matmul(c_st, Nwto)) \
+        - c_st[:, :, 0] * Ntr) * Sto / (1 + epsilon * Sto)  # stimulated recombination
+    Rolo = Sto / tauS                                       # optical losses and outcoupling term
+
+    dNbdt = Injb - Rnstb - Cap + Vr * Esc[0,:]
+    dNwdt = Injw - Rnstw - Diff - Esc - np.sum(Rst, 0)[:, np.newaxis]
+    dSdt = -Rolo + GamZ * beta * Rnstw[0, :] + GamZ * Rst[:, 0][:, np.newaxis]
     
-    return dNdt, dSdt
+    return dNbdt, dNwdt, dSdt
 
     
 def freqResp(S, S2P, ct, dt):
 
     # 0. frequency vector (GHz)
-    #f = np.linspace(start=0, stop=int(1/2/dt), num=int(ct/2))*1e-9
     f = np.arange(start=0, stop=25e9, step=1/ct/dt)*1e-9    # cap f array at 25GHz
     # 1. response to small signal step
     P = np.sum(S * S2P, 0)
@@ -168,7 +261,7 @@ def freqResp(S, S2P, ct, dt):
     H = H[:f.shape[0]]    # cap H array at 25GHz
     # 6. convert do dB
     H = 10 * np.log10(H)
-    # (7. optional: filter to remove artefacts, e.g. in case rtol is too large in solve_ivp)
+    # (7. optional: filte0r to remove artefacts, e.g. in case rtol is too large in solve_ivp)
     #H = savgol_filter(H, window_length=(ct/2), polyorder=4, mode='mirror')
     
     return f, H
@@ -188,22 +281,32 @@ def VISTAS1D(sp, vp):
     vg = 100 * c0 / vp['ng']    # group velocity [cm/s]
 
     # cavity geometry parameters
-    rCav = 3 * vp['rOx']                              # optical field and carriers extend beyond the active layer, delimited by the oxide
-    Vcav = np.pi * rCav**2 * vp['nqw'] * vp['dqw']    # cavity volume (cm-3)
-    Vbar = np.pi * rCav**2 * vp['db']                 # barriers volume (cm-3)
-    Vratio = Vcav / Vbar                              # ratio of QWs to barriers volume
-    GamZ = vp['dqw'] * vp['nqw'] / vp['Leff']          # longitudinal optical confinement factor 
+    rCav = 3 * vp['rox']                              # optical field and carriers extend beyond the active layer, delimited by the oxide
+    Vw = np.pi * rCav**2 * vp['nw'] * vp['dw']    # cavity volume (cm-3)
+    Vb = np.pi * rCav**2 * vp['db']                 # barriers volume (cm-3)
+    Vr = Vw / Vb                              # ratio of QWs to barriers volume
+    GamZ = vp['dw'] * vp['nw'] / vp['Leff']          # longitudinal optical confinement factor 
     nrho = 100  # radial steps
     nphi = 200  # azimuthal steps
     rho = np.linspace(0, rCav, nrho)
     rho = rho[:, np.newaxis]                # np rank one array -> (1, nrho) vector (rank 2 array)
     phi = np.linspace(0, 2*np.pi, nphi)
     phi = phi[:, np.newaxis]                # np rank one array -> (1, nphi) vector (rank 2 array)
+    
+    # misc parameters
+    nNb = 1             # number of equations describing Nb, constant
+    nNw = sp['nNw']     # single variable to improve readability
+    if sp['SCHtransp'] == True:
+        taub = (1/vp['tauNb'] + 1/vp['tauCap'])**-1     # "equivalent aggregated" carrier lifetime in the barriers
+        tauw = (1/vp['tauNw'] + 1/vp['tauEsc'])**-1     # "equivalent aggregated" carrier lifetime in the QWs
+    else:
+        taub = vp['tauNb']
+        tauw = vp['tauNw']
 
     # 2. normalized modes intensity profiles -----------------------------------------------------------
 
     tStart = time.time()    
-    nm, lvec, LPlm, ur = LP_modes(vp['wl0']* 1e-9, vp['nc'], vp['dn'], vp['rOx'] * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
+    nS, lvec, LPlm, ur = LP_modes(vp['wl0']* 1e-9, vp['nc'], vp['dn'], vp['rox'] * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
 
     # normalized intensity profiles
     Ur = np.square(ur)  # field amplitude -> intensity
@@ -215,51 +318,51 @@ def VISTAS1D(sp, vp):
     print(f'Mode profiles computation: {np.round(tEnd - tStart, 3)}s')
 
     # size correction of parameters defined individually for each mode
-    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(vp['Rt'] * vp['Rb'])) * np.ones((nm, 1))   # mirror losses
-    alphai = vp['alphai'] * np.ones((nm, 1))
-    epsilon = vp['epsilon'] * np.ones((nm, 1))
-    beta = vp['beta'] * np.ones((nm, 1))
-    GamZ = GamZ * np.ones((nm, 1))
+    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(vp['Rt'] * vp['Rb'])) * np.ones((nS, 1))   # mirror losses
+    alphai = vp['alphai'] * np.ones((nS, 1))
+    epsilon = vp['epsilon'] * np.ones((nS, 1))
+    beta = vp['beta'] * np.ones((nS, 1))
+    GamZ = GamZ * np.ones((nS, 1))
 
     # 3. radial injection current profile --------------------------------------------------------------
 
-    iact = (rho <= vp['rOx']) * 1   # "active" area, typically delimited by the oxide aperture
-    ispread = (rho > vp['rOx']) * np.exp(-(rho - vp['rOx']) / vp['rs'])
+    iact = (rho <= vp['rox']) * 1   # "active" area, typically delimited by the oxide aperture
+    ispread = (rho > vp['rox']) * np.exp(-(rho - vp['rox']) / vp['rs'])
     irho = iact + ispread
     norm = np.trapz(irho * rho, rho, axis = 0) * 2 / rCav**2
     irho = irho / norm
-    # plt.plot(rho, irho)
-    # plt.show() 
     
     # 4. coefficient arrays ----------------------------------------------------------------------------
 
     tStart = time.time()     
     # carrier radial series expansion terms J0i = J0(gammai * rho / rCav)
-    gammai = np.asarray(jn_zeros(1, sp['ni']-1))      # scipy function that calculates the roots of the Bessel function
+    gammai = np.asarray(jn_zeros(1, nNw-1))     # scipy function that calculates the roots of the Bessel function (excl first trivial 0 root!)
     gammai = np.insert(gammai, 0, 0, axis = 0)  # prepend 0 root, not included by jn_zero
     gammai = gammai[:, np.newaxis]
-    J0i = jn(0, gammai * rho.T / rCav)         # bessel expansion terms J0i (sp['ni'] of them)
+    J0i = jn(0, gammai * rho.T / rCav)          # bessel expansion terms J0i (nNw of them)
 
     # coefficients array for calculating the average carrier density Na over the active area Na
-    c_act = np.zeros((1, sp['ni']))
-    c_act = 2 / vp['rOx']**2 * np.trapz(J0i[:, 0:round(nrho * vp['rOx'] / rCav)].T * rho[0:round(nrho * vp['rOx'] / rCav), :], rho[0:round(nrho * vp['rOx'] / rCav), :], axis = 0)    # integrates in the active area only
-    c_act = c_act[:, np.newaxis].T  # (1, sp['ni'])
+    c_act = np.zeros((1, nNw))
+    c_act = 2 / vp['rox']**2 * np.trapz(J0i[:, 0:round(nrho * vp['rox'] / rCav)].T * rho[0:round(nrho * vp['rox'] / rCav), :], rho[0:round(nrho * vp['rox'] / rCav), :], axis = 0)    # integrates in the active area only
+    c_act = c_act[:, np.newaxis].T  # (1, nNw)
 
     # coefficients array that captures the spatial overlap between current and carrier profiles
-    c_inj = np.zeros((sp['ni'], 1))
-    c_inj = np.trapz(J0i.T * irho * rho, rho, axis = 0)                         # (sp['ni'], )
-    c_inj = c_inj[:, np.newaxis]                                                # (sp['ni'], 1)
-    c_inj = c_inj * 2 * vp['etaI'] / q / Vcav / (rCav * jn(0, gammai))**2     # (sp['ni'], 1)
+    c_injw = np.zeros((nNw, 1))
+    c_injw = np.trapz(J0i.T * irho * rho, rho, axis = 0)    # (nNw, )
+    c_injw = c_injw[:, np.newaxis]                          # (nNw, 1)
+    c_injw = c_injw * 2 / (rCav * jn(0, gammai))**2         # (nNw, 1)
+
+    c_injb =  vp['etai'] / q / Vb
 
     # coefficients array that captures the overlap between carrier expansion terms to model diffusion
-    c_diff = np.zeros((sp['ni'], 1))
-    c_diff = vp['DN'] * (gammai / rCav)**2     # (sp['ni'], 1)
+    c_diff = np.zeros((nNw, 1))
+    c_diff = vp['DN'] * (gammai / rCav)**2     # (nNw, 1)
 
     # coefficients array that captures the overlap between carrier expansion terms and mode profiles
-    c_st = np.zeros((nm, sp['ni'], sp['ni']))
-    for m in range(nm):
-        for i in range(sp['ni']):
-            for j in range(sp['ni']):
+    c_st = np.zeros((nS, nNw, nNw))
+    for m in range(nS):
+        for i in range(nNw):
+            for j in range(nNw):
                     prodTmp = J0i[j, :] * Ur[m, :] * J0i[i, :] * rho.reshape((-1,)) # reshape -> dim (nrho, )
                     prodTmp = prodTmp[:, np.newaxis]
                     c_st[m, i, j] = 2 * vp['GamR'] * vg / (rCav * jn(0, gammai[i]))**2 * np.trapz(prodTmp, rho, axis = 0)    
@@ -269,16 +372,16 @@ def VISTAS1D(sp, vp):
 
     # 5. size adjustment of modal parameters and definition of temp optical parameters -----------------------
 
-    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(vp['Rt'] * vp['Rb'])) * np.ones((nm, 1))   # mirror losses
-    alphai = vp['alphai'] * np.ones((nm, 1))
-    epsilon = vp['epsilon'] * np.ones((nm, 1))
-    beta = vp['beta'] * np.ones((nm, 1))
-    GamZ = GamZ * np.ones((nm, 1))
+    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(vp['Rt'] * vp['Rb'])) * np.ones((nS, 1))   # mirror losses
+    alphai = vp['alphai'] * np.ones((nS, 1))
+    epsilon = vp['epsilon'] * np.ones((nS, 1))
+    beta = vp['beta'] * np.ones((nS, 1))
+    GamZ = GamZ * np.ones((nS, 1))
     
     tauS = 1 / vg / (alpham + alphai) # photon lifetime (to calculate the Rolo - the optical losses and outcoupling)
     F = (1 - vp['Rt']) / ((1 - vp['Rt']) + np.sqrt(vp['Rt'] / vp['Rb']) * (1 - vp['Rb'])) # fraction of power emitted at the top facet
-    etaOpt = F * alpham / (alphai + alpham)             # optical efficiency (etaOpt*etaI=etaD)  
-    S2P = etaOpt * hvl / vp['wl0'] * Vcav / tauS / GamZ * 1e3 # conversion factor photon density -> optical power (nm, 1)
+    etaOpt = F * alpham / (alphai + alpham)             # optical efficiency (etaOpt*etai=etaD)  
+    S2P = etaOpt * hvl / vp['wl0'] * Vw / tauS / GamZ * 1e3 # conversion factor photon density -> optical power (nS, 1)
     
     # 6. current and time characteristics --------------------------------------------------------------
 
@@ -317,62 +420,91 @@ def VISTAS1D(sp, vp):
     # 7. steady-state (LI) solution --------------------------------------------------------------------
 
     tStart = time.time() 
-    Imax = 10e-3                                # current range for LI characteristic
-    dI = 0.1e-3                                 # current steps (must be small enough to ensure convergence)
+    Imax = 10e-3                                    # current range for LI characteristic
+    dI = 0.05e-3                                    # current steps (must be small enough to ensure convergence)
 
-    Icw = np.arange(0, Imax, dI)                # current vector
-    NScw = np.zeros((sp['ni'] + nm, Icw.shape[0]))    # NS solution matrix (sp['ni']+nm, Imax / dI)
-    NScw[0:sp['ni'], 1] = (c_inj * Icw[1] / (1/vp['tauN'] + c_diff)).reshape((-1,))  # N-analytical solution (Rst = 0) for 2nd current step
-    NScw[sp['ni']:sp['ni'] + nm, 1] = np.maximum((GamZ * beta / vp['tauN'] * NScw[0, 1] * tauS).reshape((-1,)), 0) # S-analytical solution (Rst = 0) for 2nd current step
-   
-    for i in range(2, Icw.shape[0], 1): # sol@0: 0, sol@1: NScw[:, 1] -> calculated analytically above
-        args = (sp['ni'], nm, c_act, c_inj, Icw[i], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauN'], tauS)
-        NScw[:, i] = fsolve(cw_1D, NScw[:, i - 1], args = args, fprime = Jac_cw_1D)
+    Icw = np.arange(0, Imax, dI)                    # current vector
+    NScw = np.zeros((nNb+nNw+nS, Icw.shape[0]))  # NS solution matrix (nNb+nNw+nS, Imax / dI)
 
+    # analytical solution (below threshold) as "seed"
+
+    A = np.zeros((nNb+nNw+nS, nNb+nNw+nS))    # matrix to solve analytically system of linear Nb, Nw and Sm equations below threshold
+    b = np.zeros((nNb+nNw+nS, 1))                # b vector (Ax = b)
+    
+    for i in range(nNw):
+        A[i+1, i+1] = -1/tauw - c_diff[i, 0]
+        A[nNb+nNw:, 1] = -(GamZ * beta / vp['tauNw']).reshape((-1,))
+    for i in range(nS):
+        A[nNb+nNw+i, nNb+nNw+i] = 1 / tauS[i]
+
+    if sp['SCHtransp'] == True:
+        A[0, 0] = 1/taub                                                # coefficients for Nb equation
+        A[1:nNw+1, 0] = c_injw.reshape((-1,)) / Vr / vp['tauCap']  # coefficients for Nw equations
+        A[0, 1] = -Vr / vp['tauEsc']
+        b[0, 0] = c_injb * Icw[1]
+        NScw[:, 1] = np.linalg.solve(A, b).reshape((-1,))    # analytical solution for 2nd current step, calculated through matrix inversion
+    else:
+        b[1:nNb+nNw,0] = -c_injw.reshape((-1,)) * c_injb / Vr * Icw[1]
+        NScw[1:, 1] = np.linalg.solve(A[1:, 1:], b[1:,:]).reshape((-1,))    # first row and column (related to Nb) removed from A and b matrices
+
+    # main solver loop: sol@I0: 0, sol@I1: NScw[:, 1] calculated analytically above, sol@I3...ct calculated below using fsolve and Jacobian
+    for i in range(2, Icw.shape[0], 1):
+        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Icw[i], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)
+        NScw[:, i] = fsolve(cw_1D_transp, NScw[:, i-1], args = args, fprime = Jac_cw_1D_transp)
+
+    # interpolation function for later use
     NScwInterp = interp1d(x = Icw, y = NScw, fill_value = "extrapolate")    # extrapolates the LI characteristic -> NScwInterp(I)
-
     tEnd = time.time()
     print(f'LI solution: {np.round(tEnd - tStart, 3)}s')
 
     # 8. solver main loop ------------------------------------------------------------------------------
 
     tStart = time.time() 
-    N = np.zeros((sp['ni'], ct))    # N0, N1, ..., NnN
-    S = np.zeros((nm, ct))          # multimode photon number matrix
-    NSinit = NScwInterp(It[0])      # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
-    f = np.zeros((1,1))               # initialization as np array to allow savings results even if no freq response is calculated
-    H = np.zeros((1,1))
+    Nb = np.zeros((nNb, ct))            # Nb(t)
+    Nw = np.zeros((nNw, ct))            # Nw0(t), Nw1(t), ..., NnNw(t)
+    S = np.zeros((nS, ct))              # multimode photon number matrix
 
-    if sp['odeSolver'] == 'Finite Diff.':       # 8a. solution of system of ODEs using finite differences with constant time-step
+    NSinit = NScwInterp(It[0])          # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
+    
+    f = np.zeros((1,1))                 # initialization as np array to allow savings results even if no freq response is calculated
+    H = np.zeros((1,1))                 # initialization as np array to allow savings results even if no freq response is calculated
 
-        Nto = np.zeros((sp['ni'], 1))           # temp variable for passed to FD calculation function
-        Sto = np.zeros((nm, 1))                 # temp variable for passed to FD calculation function
+    if sp['odeSolver'] == 'Finite Diff.':   # 8a. solution of system of ODEs using finite differences with constant time-step
 
-        N[:, 0] = NSinit[:sp['ni']]
-        S[:, 0] = NSinit[sp['ni']:]
+        Nbto = np.zeros((nNb, 1))       # temp variable passed to FD calculation function ('o' for 'old')
+        Nwto = np.zeros((nNw, 1))       # temp variable passed to FD calculation function ('o' for 'old')
+        Sto = np.zeros((nS, 1))         # temp variable passed to FD calculation function ('o' for 'old')
+
+        Nb[:, 0] = NSinit[0]            # first point initialized at the LI value: Nb @ I(t=0)
+        Nw[:, 0] = NSinit[1:nNb+nNw]    # first point initialized at the LI value: Nw @ I(t=0)
+        S[:, 0] = NSinit[nNb+nNw:]      # first point initialized at the LI value: Sm @ I(t=0)
      
         for ti in range(ct - 1):
-            Nto[:, 0] = N[:, ti]
+            Nbto[0, 0] = Nb[0, ti]
+            Nwto[:, 0] = Nw[:, ti]
             Sto[:, 0] = S[:, ti]
 
-            dNdt, dSdt = FD_1D(Nto, Sto, sp['ni'], nm, c_act, c_inj, It[ti], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauN'], tauS) # rhs of system of ODEs
-
-            Ntn = Nto + dt * dNdt               # Finite Differences step
-            N[:, ti + 1] = Ntn.reshape((-1,))
+            dNbdt, dNwdt, dSdt = FDsolver_1D_transp(sp['SCHtransp'], Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_injw, It[ti], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], tauS) # rhs of system of ODEs
+            
+            Nbtn = Nbto + dt * dNbdt            # Finite Differences step ('n' in Nbtn stands for for 'new')
+            Nb[0, ti+1] = Nbtn.reshape((-1,))
+            Nwtn = Nwto + dt * dNwdt            # Finite Differences step
+            Nw[:, ti+1] = Nwtn.reshape((-1,))
             
             Stn = Sto + dt * dSdt               # Finite Differences step
-            S[:, ti + 1] = Stn.reshape((-1,))
+            S[:, ti+1] = Stn.reshape((-1,))
         tEnd = time.time()
         print(f'FD ODE solution: {np.round(tEnd - tStart, 3)}s')
 
-        tStart = time.time()
-        if sp['modFormat'] == 'small signal':
-            f, H = freqResp(S[:,1:], S2P, ct-1, dt)   # compute frequency response
+        if sp['modFormat'] == 'small signal':   # must be calculated prior to subsampling
+            tStart = time.time()
+            f, H = freqResp(S[:, 1:], S2P, ct-1, dt)   # compute frequency response
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
-        # subsampling: smaller timestep needed to ensure convergence, but too dense for post-processing  
-        N = N[:, ::int(sp['dt']/dt)]
+        # small timestep dtFD needed to ensure convergence, but too dense for post-processing -> subsampling to dt  
+        Nb = Nb[:, ::int(sp['dt']/dt)]
+        Nw = Nw[:, ::int(sp['dt']/dt)]
         S = S[:, ::int(sp['dt']/dt)]
         teval = teval[::int(sp['dt']/dt)]
         ct = len(teval)
@@ -382,24 +514,25 @@ def VISTAS1D(sp, vp):
 
         tStart = time.time()        
         It = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
-        args = (sp['ni'], nm, c_act, c_inj, It, c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauN'], tauS)
         
-        sol = solve_ivp(solver_1D, (0, sp['tmax']), NSinit, t_eval=teval, method=sp['odeSolver'], dense_output=True, vectorized=True, args=args, rtol=1e-6, atol=1e-6)
-        #sol = odeint(solver_1D, NSinit, t = teval, args = args, tfirst = True, Dfun = Jac_cw_1D)
+        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)       
+        sol = solve_ivp(ODEsolver_1D_transp, (0, sp['tmax']), NSinit, t_eval=teval, method=sp['odeSolver'], dense_output=True, vectorized=True, args=args, rtol=1e-6, atol=1e-6, jac=Jac_1D_transp)
 
-        N = sol.y[:sp['ni']]
-        S = sol.y[sp['ni']:sp['ni']+nm]
+        Nb = sol.y[0]
+        Nw = sol.y[1:nNb+nNw]
+        S = sol.y[nNb+nNw:]
         tEnd = time.time()
         print(f'solve_ivp ODE solution: {np.round(tEnd - tStart, 3)}s')
 
-        tStart = time.time()
         if sp['modFormat'] == 'small signal':
+            tStart = time.time()
             f, H = freqResp(S[:,1:], S2P, ct-1, dt)   # compute frequency response
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
+    
+    return rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
 
-    return rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
-
+    
 def main():
     
     with open('last_params.json', 'r') as openfile:
