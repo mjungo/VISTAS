@@ -1,6 +1,6 @@
 {
     "simParams": {
-        "SCHtransp": false,
+        "SCHtransp": true,
         "ThermMod": false,
         "Noise": false,
         "Parasitics": false,
