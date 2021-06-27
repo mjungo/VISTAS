@@ -32,7 +32,7 @@ from VISTAS_visualization import *
 # GUI/params mgmt: check the type and correct the unit (ns->s, mA->A) to make sure correct values are stored in the dictionaries sp and vp
 def check_value(k, v):
 
-    if k in ['SCHTransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'storeN', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'Eyeplot']:
+    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'storeN', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'Eyeplot']:
         try:
             v = bool(v)
         except:
@@ -46,7 +46,7 @@ def check_value(k, v):
             sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
             v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
 
-    elif k == 'ni':
+    elif k == 'nNw':
         try:
             v = int(v)
         except:
@@ -85,7 +85,6 @@ def save_params(sp, vp, sr, file_name):
 def update_dict(values, d):
     for k, v in d.items():             # update entire dictionary
         k, d[k] = check_value(k, values[k])
-
     return d
 
 
@@ -159,7 +158,7 @@ def update_gui(window, values, sp, vp):
 
 # GUI/params mgmt: main function, incl. layout and events loop 
 def GUI():
-
+    
     # 0. load last parameters into sp and vp dictionaries -------------------------------------------------------
     params = load_params('last_params.json')  # loads params file and populates dictionaries sp and vp
     sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded (for that, chose "load params" and select any file but last_params.json or default_params.json)
@@ -171,16 +170,16 @@ def GUI():
     # 1. Tabs layout -------------------------------------------------------
     spTab_layout = [
         [sg.Frame('Simulated effects',[
-            [sg.Checkbox('carrier transport into the quantum wells', key='SCHTransp', default=sp['SCHTransp'], size=(45,1), disabled=True, tooltip=ttips['SCHTransp'], enable_events=True)],
+            [sg.Checkbox('carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
             [sg.Checkbox('thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
             [sg.Checkbox('noise', key='Noise', default=sp['Noise'], disabled=True, tooltip=ttips['Noise'], enable_events=True)],
             [sg.Checkbox('electrical parasitics', key='Parasitics', default=sp['Parasitics'], disabled=True, tooltip=ttips['Parasitics'], enable_events=True)],
             [sg.Checkbox('2D', key='2D', default=sp['2D'], disabled=True, tooltip=ttips['2D'], enable_events=True)],
             ])],
         [sg.Frame('Simulation parameters',[
-            [sg.InputText(sp['ni'], key='ni', size=(7,1), tooltip=ttips['ni'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
+            [sg.InputText(sp['nNw'], key='nNw', size=(7,1), tooltip=ttips['nNw'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
             [sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
-            [sg.Combo(values=('RK45', 'RK23', 'DOP853', 'LSODA', 'Finite Diff.'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
+            [sg.Combo(values=('RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA', 'Finite Diff.'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
             [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['modFormat']=='small signal'), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
             [sg.InputText(round(float(0 if sp['dt'] is None else sp['dt'])*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
             [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
@@ -208,14 +207,14 @@ def GUI():
             [sg.Multiline(vp['vcselDescr'], key='vcselDescr', size=(52,2), tooltip=ttips['vcselDescr'], enable_events=True)],
             ])],
         [sg.Frame('Cavity geometry parameters',[
-            [sg.InputText(vp['rOx'], key='rOx', size=(7,1), tooltip=ttips['rOx'], enable_events=True), sg.Text('rOx: oxide aperture radius (cm)', size=(40,1))],
+            [sg.InputText(vp['rox'], key='rox', size=(7,1), tooltip=ttips['rox'], enable_events=True), sg.Text('rox: oxide aperture radius (cm)', size=(40,1))],
             [sg.InputText(vp['Leff'], key='Leff', size=(7,1), tooltip=ttips['Leff'], enable_events=True), sg.Text('Leff: effective cavity length (cm)')],
-            [sg.InputText(vp['nqw'], key='nqw', size=(7,1), tooltip=ttips['nqw'], enable_events=True), sg.Text('nqw: number of quantum wells')],
-            [sg.InputText(vp['dqw'], key='dqw', size=(7,1), tooltip=ttips['dqw'], enable_events=True), sg.Text('dqw: single QW thickness (cm)')],
+            [sg.InputText(vp['nw'], key='nw', size=(7,1), tooltip=ttips['nw'], enable_events=True), sg.Text('nw: number of quantum wells')],
+            [sg.InputText(vp['dw'], key='dw', size=(7,1), tooltip=ttips['dw'], enable_events=True), sg.Text('dw: single QW thickness (cm)')],
             [sg.InputText(vp['db'], key='db', size=(7,1), tooltip=ttips['db'], enable_events=True), sg.Text('db: SCH thickness (cm)')],
             ])],
         [sg.Frame('Equivalent waveguide parameters',[
-            [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nm)', size=(40,1))],
+            [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nS)', size=(40,1))],
             [sg.InputText(vp['nc'], key='nc', size=(7,1), tooltip=ttips['nc'], enable_events=True), sg.Text('nc: core equivalent refractive index')],
             [sg.InputText(vp['ng'], key='ng', size=(7,1), tooltip=ttips['ng'], enable_events=True), sg.Text('ng: group refractive index')],
             [sg.InputText(vp['dn'], key='dn', size=(7,1), tooltip=ttips['dn'], enable_events=True), sg.Text('dn: equivalent fractional refractive index change')],
@@ -234,10 +233,10 @@ def GUI():
             ])],
         [sg.Frame('Carrier transport and diffusion parameters',[
             [sg.InputText(vp['tauNb'], key='tauNb', size=(7,1), tooltip=ttips['tauNb'], enable_events=True), sg.Text('tauNb: carrier lifetime in the barriers (s)', size=(40,1))],
-            [sg.InputText(vp['tauN'], key='tauN', size=(7,1), tooltip=ttips['tauN'], enable_events=True), sg.Text('tauN: carrier lifetime in the QWs (s)', size=(40,1))],
+            [sg.InputText(vp['tauNw'], key='tauNw', size=(7,1), tooltip=ttips['tauNw'], enable_events=True), sg.Text('tauNw: carrier lifetime in the QWs (s)', size=(40,1))],
             [sg.InputText(vp['tauCap'], key='tauCap', size=(7,1), tooltip=ttips['tauCap'], enable_events=True), sg.Text('tauCap: ambipolar diffusion time (s)')],
             [sg.InputText(vp['tauEsc'], key='tauEsc', size=(7,1), tooltip=ttips['tauEsc'], enable_events=True), sg.Text('tauEsc: thermionic emission lifetime (s)', size=(40,1))],
-            [sg.InputText(vp['etaI'], key='etaI', size=(7,1), tooltip=ttips['etaI'], enable_events=True), sg.Text('etaI: current injection efficiency')],
+            [sg.InputText(vp['etai'], key='etai', size=(7,1), tooltip=ttips['etai'], enable_events=True), sg.Text('etai: current injection efficiency')],
             [sg.InputText(vp['rs'], key='rs', size=(7,1), tooltip=ttips['rs'], enable_events=True), sg.Text('rs: current spreading coefficient (cm)')],
             [sg.InputText(vp['DN'], key='DN', size=(7,1), tooltip=ttips['DN'], enable_events=True), sg.Text('DN: ambipolar diffusion coeff. (cm2/s)')],
             ])],
@@ -264,7 +263,7 @@ def GUI():
 
         elif event == 'initialize params':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -277,7 +276,7 @@ def GUI():
 
         elif event == 'load file':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -285,7 +284,7 @@ def GUI():
             file_name = values['load file']
             if file_name != '':
                 params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
-                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, N, ur, etc.)
+                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, Nw, ur, etc.)
                 del params
                 update_gui(window, values, sp, vp)   
 
@@ -297,7 +296,8 @@ def GUI():
                     "nphi": nphi,
                     "rho": rho.tolist(),
                     "nrho": nrho,
-                    "nm": nm,
+                    "nNw": nNw,
+                    "nS": nS,
                     "LPlm": LPlm,
                     "lvec": lvec.tolist(),
                     "Ur": Ur.tolist(),
@@ -307,7 +307,8 @@ def GUI():
                     "f": f.tolist(),
                     "H": H.tolist(),
                     "S2P": S2P.tolist(),
-                    "N": N.tolist(),
+                    "Nb": Nb.tolist(),
+                    "Nw": Nw.tolist(),
                     "S": S.tolist(),
                 }
             else:
@@ -319,15 +320,15 @@ def GUI():
         elif event == 'run simulation':
             save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
             
-            rho, nrho, phi, nphi, nm, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, N = VISTAS1D(sp, vp)
+            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
             # visualization
             if sp['Uxyplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
-                plot2D(Ur, LPlm, lvec, nm, rho*1e-2, nrho, phi, nphi, nfig = 1)              
+                plot2D(Ur, LPlm, lvec, nS, rho*1e-2, nrho, phi, nphi, nfig = 1)              
         
             if sp['PIplot'] == 1:   # steady-state LI characteristic Popt(I)
-                plotPower(Icw * 1e3, S2P*NScw[sp['ni']:,:], LPlm, xlabel = 'current (mA)') 
+                plotPower(Icw * 1e3, S2P*NScw[NScw.shape[0]-nS:,:], LPlm, xlabel = 'current (mA)')  
 
             if sp['Ptplot'] == 1:   # dynamic response Popt(t)
                 plotPower(teval * 1e9, S2P*S, LPlm, xlabel = 'time (ns)')
