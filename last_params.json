@@ -1,6 +1,6 @@
 {
     "simParams": {
-        "SCHtransp": false,
+        "SCHtransp": true,
         "ThermMod": false,
         "Noise": false,
         "Parasitics": false,
@@ -11,13 +11,13 @@
         "tmax": 1e-08,
         "dt": 1e-11,
         "dtFD": 1e-12,
-        "modFormat": "pulse",
+        "modFormat": "step",
         "Ion": 0.005,
         "Ioff": 0.002,
         "Iss": 0.0001,
         "tb": 5e-10,
         "Uxyplot": false,
-        "PIplot": false,
+        "PIplot": true,
         "Ptplot": true,
         "NSxyplot": true,
         "RINplot": true,
@@ -25,7 +25,7 @@
         "Eyeplot": true
     },
     "vcselParams": {
-        "vcselDescr": "free text\n",
+        "vcselDescr": "free text",
         "rox": 0.0005,
         "Leff": 0.00013,
         "nw": 3.0,
@@ -47,7 +47,7 @@
         "tauNw": 1.6e-09,
         "tauCap": 5e-11,
         "tauEsc": 5e-10,
-        "etai": 1.0,
+        "etai": 1,
         "rs": 5e-05,
         "DN": 12.0
     },
