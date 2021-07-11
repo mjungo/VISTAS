@@ -76,14 +76,14 @@ def plotPower(x, P, modes, xlabel):
     plt.show()
 
 
-# plot frequency response
-def plotH(f, H):
+# plot spectra (frequency response and RIN)
+def plotSpectrum(f, y, ylabel, fmin, fmax, ymin, ymax):
 
-    plt.plot(f, H)
-    plt.xlim(xmin=0, xmax=10)
-    plt.ylim(ymin=-10, ymax=15)
+    plt.plot(f, y)
+    plt.xlim(xmin=fmin, xmax=fmax)
+    plt.ylim(ymin=ymin, ymax=ymax)
     plt.xlabel('frequency (GHz)')
-    plt.ylabel('frequency response (dB)')
+    plt.ylabel(ylabel)
     plt.grid()
     plt.show()
 
