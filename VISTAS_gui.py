@@ -32,25 +32,25 @@ from VISTAS_visualization import *
 # GUI/params mgmt: check the type and correct the unit (ns->s, mA->A) to make sure correct values are stored in the dictionaries sp and vp
 def check_value(k, v):
 
-    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'storeN', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'Eyeplot']:
+    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'Eyeplot']:
         try:
             v = bool(v)
         except:
-            sg.popup('Bool input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            #sg.popup('Bool input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
             v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
 
     elif k in ['odeSolver', 'modFormat', 'vcselDescr']:
         try:
             v = str(v)
         except:
-            sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            #sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
             v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
 
     elif k == 'nNw':
         try:
             v = int(v)
         except:
-            sg.popup('Integer input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            #sg.popup('Integer input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
             v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
     else:
         try:
@@ -60,7 +60,7 @@ def check_value(k, v):
             elif k in ['Ion', 'Ioff', 'Iss']:       # converts mA to A
                 v = round(v * 1e-3, 5)
         except:
-            sg.popup('Float input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
+            #sg.popup('Float input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
             v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
 
     return k, v
@@ -89,7 +89,7 @@ def update_dict(values, d):
 
 
 # GUI/params mgmt: disable elements not used for certain combinations of parameters
-def disable_elements(window, values):
+def manage_params_combos(window, values):
 
     # simulation parameters
     if values['odeSolver'] == 'Finite Diff.':
@@ -103,38 +103,92 @@ def disable_elements(window, values):
         window['Ioff'].Update(disabled = True)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = True)
-        window['Eyeplot'].Update(disabled = True)
-        window['Hfplot'].Update(disabled = True)
     
     elif values['modFormat'] == 'pulse':
         window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = True)
-        window['Eyeplot'].Update(disabled = True)
-        window['Hfplot'].Update(disabled = True)
 
     elif values['modFormat'] == 'random bits':
         window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = False)
-        window['Eyeplot'].Update(disabled = False)
-        window['Hfplot'].Update(disabled = True)
 
     elif values['modFormat'] == 'small signal':
+        if values['Hfplot'] == True:
+            window['tmax'].Update(disabled = True)
+        else:
+            window['tmax'].Update(disabled = False)
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = False)
+        window['tb'].Update(disabled = True)
+
+    elif values['modFormat'] == 'steady state':
+        if values['RINplot'] == True:
+            window['tmax'].Update(disabled = True)
+        else:
+            window['tmax'].Update(disabled = False)
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)      
+
+    # forces FD solution and disables freq resp calculation for simulations including noise
+    if values['Noise'] == True:
+        window['RINplot'].Update(disabled = False)
+        window['Hfplot'].Update(False)
+        values['Hfplot'] = False
+        window['Hfplot'].Update(disabled = True)
+        window['odeSolver'].Update('Finite Diff.')
+        values['odeSolver'] = 'Finite Diff.'
+        window['dtFD'].Update(disabled = False)
+    else:
+        window['RINplot'].Update(False)
+        values['RINplot'] = False
+        window['RINplot'].Update(disabled = True)
+        window['Hfplot'].Update(disabled = False)
+
+    # forces modeFormat to 'small signal' when plotting freq resp is selected
+    if values['Hfplot'] == True:
+        window['modFormat'].Update('small signal')
+        values['modFormat'] = 'small signal'
         window['tmax'].Update(disabled = True)
         window['Ioff'].Update(disabled = True)
         window['Iss'].Update(disabled = False)
         window['tb'].Update(disabled = True)
-        window['Eyeplot'].Update(disabled = True)
-        window['Hfplot'].Update(disabled = False)
+        window['RINplot'].Update(False)
+        values['RINplot'] = False
+        window['Eyeplot'].Update(False)
+        values['Eyeplot'] = False
 
-    # simulated effects
-    if values['Noise'] == True and values['modFormat'] == 'step':
-        window['RINplot'].Update(disabled = False)
-    else:
-        window['RINplot'].Update(disabled = True)
+    # forces modeFormat to 'steady state' when plotting RIN is selected
+    if values['RINplot'] == True:
+        window['modFormat'].Update('steady state')
+        values['modFormat'] = 'steady state'
+        window['tmax'].Update(disabled = True)
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)
+        window['Hfplot'].Update(False)
+        values['Hfplot'] = False
+        window['Eyeplot'].Update(False)
+        values['Eyeplot'] = False
+
+    # forces modeFormat = 'random bits' when plotting eye is selected
+    if values['Eyeplot'] == True:
+        window['modFormat'].update('random bits')
+        values['modFormat'] = 'random bits'
+        window['tmax'].Update(disabled = False)
+        window['Ioff'].Update(disabled = False)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = False)
+        window['RINplot'].Update(False)
+        values['RINplot'] = False
+        window['Hfplot'].Update(False)
+        values['Hfplot'] = False
+
+    return values
 
 
 # GUI/params mgmt: update gui (incl. disabling elements) after initializing or loading params file
@@ -150,8 +204,7 @@ def update_gui(window, values, sp, vp):
     for k, v in vp.items():             # update entire vcselParams dictionary
         values[k] = vp[k]
         window[k].update(values[k])
-
-    disable_elements(window, values)
+    # manage_params_combos(window, values)
 
     return values
 
@@ -170,22 +223,22 @@ def GUI():
     # 1. Tabs layout -------------------------------------------------------
     spTab_layout = [
         [sg.Frame('Simulated effects',[
-            [sg.Checkbox('carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
-            [sg.Checkbox('thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
-            [sg.Checkbox('noise', key='Noise', default=sp['Noise'], disabled=True, tooltip=ttips['Noise'], enable_events=True)],
-            [sg.Checkbox('electrical parasitics', key='Parasitics', default=sp['Parasitics'], disabled=True, tooltip=ttips['Parasitics'], enable_events=True)],
+            [sg.Checkbox('Carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
+            [sg.Checkbox('Thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
+            [sg.Checkbox('Noise', key='Noise', default=sp['Noise'], disabled=False, tooltip=ttips['Noise'], enable_events=True)],
+            [sg.Checkbox('Electrical parasitics', key='Parasitics', default=sp['Parasitics'], disabled=True, tooltip=ttips['Parasitics'], enable_events=True)],
             [sg.Checkbox('2D', key='2D', default=sp['2D'], disabled=True, tooltip=ttips['2D'], enable_events=True)],
             ])],
         [sg.Frame('Simulation parameters',[
             [sg.InputText(sp['nNw'], key='nNw', size=(7,1), tooltip=ttips['nNw'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
-            [sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
+            #[sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
             [sg.Combo(values=('RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA', 'Finite Diff.'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
-            [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['modFormat']=='small signal'), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
+            [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['Hfplot']==True or sp['RINplot']==True), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
             [sg.InputText(round(float(0 if sp['dt'] is None else sp['dt'])*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
             [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
             ])],
         [sg.Frame('Current modulation pattern',[
-            [sg.Combo(values=('step', 'pulse', 'random bits', 'small signal'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
+            [sg.Combo(values=('step', 'pulse', 'random bits', 'small signal', 'steady state'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
             [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3,1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
             [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3,1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']=='small signal' or sp['modFormat']=='step'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
             [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3,2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
@@ -197,8 +250,8 @@ def GUI():
             [sg.Checkbox('Dynamic characteristic Popt(t)', key='Ptplot', default=sp['Ptplot'], tooltip=ttips['Ptplot'], enable_events=True)],
             [sg.Checkbox('2D optical & carrier profiles within the cavity', key='NSxyplot', default=sp['NSxyplot'], disabled=True, size=(45,1), tooltip=ttips['NSxyplot'], enable_events=True)],
             [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RINplot', default=sp['RINplot'], disabled=(sp['Noise']!=True), tooltip=ttips['RINplot'], enable_events=True)],
-            [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['modFormat']!='small signal'), tooltip=ttips['Hfplot'], enable_events=True)],
-            [sg.Checkbox('Eye diagram', key='Eyeplot', default=sp['Eyeplot'], disabled=(sp['modFormat']!='random bits'), tooltip=ttips['Eyeplot'], enable_events=True)],
+            [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['Noise']==True), tooltip=ttips['Hfplot'], enable_events=True)],
+            [sg.Checkbox('Eye diagram', key='Eyeplot', default=sp['Eyeplot'], tooltip=ttips['Eyeplot'], enable_events=True)],
             ])],
         ]
 
@@ -263,7 +316,7 @@ def GUI():
 
         elif event == 'initialize params':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -276,7 +329,7 @@ def GUI():
 
         elif event == 'load file':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -286,7 +339,8 @@ def GUI():
                 params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
                 sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, Nw, ur, etc.)
                 del params
-                update_gui(window, values, sp, vp)   
+                update_gui(window, values, sp, vp)
+                values = manage_params_combos(window, values)   # update GUI based on params combos
 
         elif event == 'save file':
             file_name = values['save file']
@@ -306,6 +360,7 @@ def GUI():
                     "teval": teval.tolist(),
                     "f": f.tolist(),
                     "H": H.tolist(),
+                    "RIN": RIN.tolist(),
                     "S2P": S2P.tolist(),
                     "Nb": Nb.tolist(),
                     "Nw": Nw.tolist(),
@@ -320,9 +375,15 @@ def GUI():
         elif event == 'run simulation':
             save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
             
-            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
+            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
+            
+            # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
+            sp['tmax'] = round(max(teval * 1e9), 0) * 1e-9
+            window['tmax'].Update(int(sp['tmax'] * 1e9))
+            values['tmax'] = int(sp['tmax'] * 1e9)
+            
             # visualization
             if sp['Uxyplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
                 plot2D(Ur, LPlm, lvec, nS, rho*1e-2, nrho, phi, nphi, nfig = 1)              
@@ -333,16 +394,20 @@ def GUI():
             if sp['Ptplot'] == 1:   # dynamic response Popt(t)
                 plotPower(teval * 1e9, S2P*S, LPlm, xlabel = 'time (ns)')
                 
-            if sp['modFormat'] == 'small signal' and sp['Hfplot'] == 1: # small signal response H(f)
-                plotH(f, H)    
-            
-            if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == 1:
+            if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == True:
                 plotEye(teval, sp['dt'], sp['tb'], S2P*S)
 
+            if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
+                plotSpectrum(f, H, 'frequency response (dB)', 0, 15, -10, 10)
+
+            if sp['Noise'] == True and sp['RINplot'] == True:
+                plotSpectrum(f, RIN, 'Relative Intensity Noise (dB/Hz)', 0, 15, -160, -100)
+
         else:   # case 'gui-element change'
-            sp = update_dict(values, sp)        # update dictionary
-            vp = update_dict(values, vp)        # update dictionary
-            disable_elements(window, values)    # update GUI
+            values = manage_params_combos(window, values)   # update GUI based on params combos
+            sp = update_dict(values, sp)                    # update dictionary
+            vp = update_dict(values, vp)                    # update dictionary
+            #update_gui(window, values, sp, vp)
 
 
 def main():
