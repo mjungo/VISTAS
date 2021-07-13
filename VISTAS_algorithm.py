@@ -434,7 +434,7 @@ def VISTAS1D(sp, vp):
 
     elif sp['modFormat'] == 'small signal':
         if sp['Hfplot'] == True:        # tmax disabled and calculated automatically
-            ct = 2**14 + 1              # 32'768 points -> df = 1/dt/ct = 1/tmax = 31 MHz (for dt = 1ps)
+            ct = sp['ctH'] + 1          # e.g. ctH = 2**14 = 16'384 points -> df = 1/dt/ct = 1/tmax = 62 MHz for dt = 1ps (typical for FD) or 6mHz for dt = 10ps
             sp['tmax'] = ct * dt
         teval = np.arange(0, sp['tmax'], dt)
         It = np.ones((ct)) * (sp['Ion'] + sp['Iss'])
@@ -442,8 +442,7 @@ def VISTAS1D(sp, vp):
 
     elif sp['modFormat'] == 'steady state':
         if sp['RINplot'] == True:       # tmax disabled and calculated automatically
-            nSeg = 8                    # segments over which the average is computed
-            ct = nSeg * 2**15           # 8 segments of 32'768 points each  -> df = 1/dt/ct = 1/tmax = 31 MHz (for dt = 1ps, for each segment of length dt*2**14)
+            ct = sp['nSeg'] * sp['ctRIN'] # 8 segments of length e.g. ctRIN = 2**15 = 32'768 each  -> 8* 32.75ns = 262ns, df = 1/dt/ct = 1/tmax = 31 MHz (for dt = 1ps)
             sp['tmax'] = ct * dt
         teval = np.arange(0, sp['tmax'], dt)
         It = np.ones((ct)) * sp['Ion']  # current vector
@@ -552,7 +551,7 @@ def VISTAS1D(sp, vp):
 
         if sp['RINplot'] == True:
             tStart = time.time()
-            f, RIN = RINcalc(np.sum(S* S2P, 0) , ct, dt, nSeg, fmax=20e9)  # compute RIN spectrum
+            f, RIN = RINcalc(np.sum(S* S2P, 0) , ct, dt, sp['nSeg'], fmax=20e9)  # compute RIN spectrum
             tEnd = time.time()
             print(f'RIN calculation: {np.round(tEnd - tStart, 3)}s')
 

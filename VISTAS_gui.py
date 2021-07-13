@@ -83,8 +83,9 @@ def save_params(sp, vp, sr, file_name):
 
 # GUI/params mgmt: update dictionaries sp and vp on event, check type, adjust units
 def update_dict(values, d):
-    for k, v in d.items():             # update entire dictionary
-        k, d[k] = check_value(k, values[k])
+    for k, v in d.items():                      # update entire dictionary...
+        if not k in ['ctH', 'ctRIN', 'nSeg']:   # ... except for the three parameters that are in the dictionary and json params files, but not in the GUI 
+            k, d[k] = check_value(k, values[k])
     return d
 
 
@@ -193,15 +194,16 @@ def manage_params_combos(window, values):
 
 # GUI/params mgmt: update gui (incl. disabling elements) after initializing or loading params file
 def update_gui(window, values, sp, vp):
-    for k, v in sp.items():             # update entire simParams dictionary
-        if k in ['tmax', 'dt', 'dtFD', 'tb']:
-            values[k] = sp[k] * 1e9     # convert s to ns
-        elif k in ['Ion', 'Ioff', 'Iss']:
-            values[k] = sp[k] * 1e3     # convert A to mA
-        else:
-            values[k] = sp[k]
-        window[k].update(values[k])
-    for k, v in vp.items():             # update entire vcselParams dictionary
+    for k, v in sp.items():                     # update GUI with values stored in the simParams dictionary...
+        if not k in ['ctH', 'ctRIN', 'nSeg']:   # ... except for the three parameters that are in the dictionary and json params files, but not in the GUI 
+            if k in ['tmax', 'dt', 'dtFD', 'tb']:
+                values[k] = sp[k] * 1e9         # convert s to ns
+            elif k in ['Ion', 'Ioff', 'Iss']:
+                values[k] = sp[k] * 1e3         # convert A to mA
+            else:
+                values[k] = sp[k]
+            window[k].update(values[k])         # update GUI values
+    for k, v in vp.items():                     # update entire vcselParams dictionary
         values[k] = vp[k]
         window[k].update(values[k])
     # manage_params_combos(window, values)
@@ -267,7 +269,7 @@ def GUI():
             [sg.InputText(vp['db'], key='db', size=(7,1), tooltip=ttips['db'], enable_events=True), sg.Text('db: SCH thickness (cm)')],
             ])],
         [sg.Frame('Equivalent waveguide parameters',[
-            [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nS)', size=(40,1))],
+            [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nm)', size=(40,1))],
             [sg.InputText(vp['nc'], key='nc', size=(7,1), tooltip=ttips['nc'], enable_events=True), sg.Text('nc: core equivalent refractive index')],
             [sg.InputText(vp['ng'], key='ng', size=(7,1), tooltip=ttips['ng'], enable_events=True), sg.Text('ng: group refractive index')],
             [sg.InputText(vp['dn'], key='dn', size=(7,1), tooltip=ttips['dn'], enable_events=True), sg.Text('dn: equivalent fractional refractive index change')],
