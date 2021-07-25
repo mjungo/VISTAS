@@ -76,14 +76,34 @@ def plotPower(x, P, modes, xlabel):
     plt.show()
 
 
-# plot spectra (frequency response and RIN)
-def plotSpectrum(f, y, ylabel, fmin, fmax, ymin, ymax):
-
-    plt.plot(f, y)
+# plot frequency response spectrum
+def plotH(f, H, Parasitics, Hp, fmin, fmax, ymin, ymax):
+    
+    plt.plot(f, H, lw=1)
+    if Parasitics == True:
+        plt.plot(f, Hp, lw=1)
+        plt.plot(f, H + Hp, 'k', lw=1.5) #loga(x*y) = loga(x) + loga(y)
+        plt.legend(['intrinsic response', 'parasitics response', 'total response'])
+    else:
+        plt.legend(['intrinsic response'])
+    plt.plot([fmin, fmax], [-3, -3], 'k-', lw=1,dashes=[2, 2])
     plt.xlim(xmin=fmin, xmax=fmax)
     plt.ylim(ymin=ymin, ymax=ymax)
     plt.xlabel('frequency (GHz)')
-    plt.ylabel(ylabel)
+    plt.ylabel('frequency response (dB)')
+    plt.grid()
+    plt.show()
+    fmin = fmin + 1 - 1
+
+
+# plot spectra (frequency response and RIN)
+def plotRIN(f, RIN, fmin, fmax, ymin, ymax):
+
+    plt.plot(f, RIN)
+    plt.xlim(xmin=fmin, xmax=fmax)
+    plt.ylim(ymin=ymin, ymax=ymax)
+    plt.xlabel('frequency (GHz)')
+    plt.ylabel('Relative Intensity Noise (dB/Hz)')
     plt.grid()
     plt.show()
 
