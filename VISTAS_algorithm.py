@@ -23,11 +23,12 @@
 ##################################################################################
 
 import json
-#import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import time
 
 #from scipy.integrate import odeint
+from scipy.fft import fft, ifft, fftshift, fftfreq
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
@@ -248,44 +249,56 @@ def FDsolver_1D_transp(SCHtransp, Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_inj
     return dNbdt, dNwdt, dSdt, Rsp
 
     
-def FreqResp(S, S2P, ct, dt):
+def HfResp(S, n, dt, fmaxplot, Parasitics, Hp):
 
     # 0. frequency vector (GHz)
-    f = np.arange(start=0, stop=25e9, step=1/ct/dt)*1e-9    # cap f array at 25GHz
+    #f2 = np.arange(start=0, stop=fmaxplot, step=1/dt) * 1e-9    # cap f array at fmaxplot (default: 25GHz)
+    
+    # 0. Prep
+    df = 1 / n / dt     # frequency resolution
+    fmax = df * n / 2
+    f = np.arange(start=0, stop=fmax, step=df)
+    #f2 = fftfreq(n, dt)
+    f = f[f<=fmaxplot] * 1e-9  # GHz
     # 1. response to small signal step
-    P = np.sum(S * S2P, 0)
+    P = np.sum(S, 0)
     # 2. derivative of unit step = impulse: H(f) = Y(f) = FFT(yimp(t))) = FFT(d/dt ystep(T)
     dP = np.gradient(P, dt)    # dP = np.diff(P) / dt as alternative
     # 3. FFT to transform to frequency domain (-> complex)
-    DP = np.fft.fft(dP)
-    # 4. two-sided -> one-sided -> multiply amplitude of first half by 2, discard the rest
-    DP = DP[:int(ct/2)] * 2
-    #DP[0] = DP[0]/2
-    # 5. compute amplitude as product of DP and its complex conjugate, normalize, remove 0 complex element
-    H = DP * np.conj(DP) / ct
+    DP = fft(dP)
+    # 4. compute amplitude normalize, limite size to fmaxplot, convert to dB
+    #H = np.sqrt(DP * np.conj(DP))
+    H = np.abs(DP)
     H = H / H[0]
-    H = H.real
-    H = H[:f.shape[0]]    # cap H array at 25GHz
-    # 6. convert do dB
+    H = H[:f.shape[0]]                  # cap H array at fmaxplot
     H = 10 * np.log10(H)
+    # 6. similar steps for electrical parasitics response
+    if Parasitics == True:
+        Hp = np.abs(Hp)
+        Hp = Hp[n//2:n//2+f.shape[0]]   # cap H array at fmaxplot
+        Hp = 10 * np.log10(Hp)
     # (7. optional: filte0r to remove artefacts, e.g. in case rtol is too large in solve_ivp)
-    #H = savgol_filter(H, window_length=(ct/2), polyorder=4, mode='mirror')
+    #H = savgol_filter(H, window_length=(n/2), polyorder=4, mode='mirror')
     
-    return f, H
+    return f, H, Hp
 
 
-def RINcalc(P, ct, dt, nSeg, fmax):
+def RINcalc(P, n, dt, nSeg, fmaxplot):
 
-    # 0. frequency vector from 0 to fmax (GHz)
-    ct = ct // nSeg # time-domain response sliced into nSeg segments of length ct/nSeg
-    f = np.arange(start=0, stop=fmax, step=1/ct/dt)*1e-9    # cap f array at 25GHz
+    # 0. frequency vector from 0 to fmaxplot (GHz)
+    n = n // nSeg # time-domain response sliced into nSeg segments of length n/nSeg
+    df = 1 / n / dt     # frequency resolution
+    fmax = df * n / 2
+    f = np.arange(start=0, stop=fmax, step=df)
+    f = f[f<=fmaxplot] * 1e-9  # GHz
+    #f = np.arange(start=0, stop=fmaxplot, step=1/n/dt)*1e-9    # cap f array at fmaxplot (default: 25GHz)
     # 1. power vector
     Pmean =  np.mean(P) # average over the complete vector (all segments)
     P2D = np.reshape(P, (nSeg, int(P.shape[0]/nSeg)))   # slice vector into nSeg segments
     # 2. FFT to transform to frequency domain (-> complex)
-    DP = np.fft.fft(P2D - Pmean, axis=1)
+    DP = fft(P2D - Pmean, axis=1)
     # 3. compute amplitude as product of DP and its complex conjugate, remove 0 complex element
-    DP = DP * np.conj(DP) / ct
+    DP = DP * np.conj(DP) / n
     DP = DP.real
     # 4. compute average over nSeg segments
     DP = np.mean(DP, 0)
@@ -293,6 +306,19 @@ def RINcalc(P, ct, dt, nSeg, fmax):
     RIN = 10 * np.log10(dt * DP / Pmean**2)
 
     return f[1:], RIN[1:f.shape[0]]
+
+
+def parasiticsFilter(dt, n, Cp, Rm, Ca, Ra, It):
+    fmax = 1 / dt / 2                           # 100GHz / 2 = 50GHz for dt = 10ps
+    f = np.linspace(-fmax, fmax, n)             # symetrical frequency spectrum (full FFT)
+    w = 2 * np.pi * f                           # angular frequency
+    Hp = (1 / Cp / Rm / Ca / Ra) / (-w**2 - 1j * w * (Ca * Ra + Cp * Rm + Cp * Ra) / Cp / Ca / Ra / Ra + 1/ Cp / Ca / Rm / Ra)  # frequency response of passive parasitics circuit
+    IHt = np.abs(ifft(Hp * fftshift(fft(It))))  # 1. It spectrum, 2. multiply by filter, 3. convert back to time domain, 4. take the absolute value
+    # plt.plot(It)
+    # plt.plot(IHt)
+    # plt.show()
+
+    return Hp, IHt
 
 
 def VISTAS1D(sp, vp):
@@ -407,46 +433,70 @@ def VISTAS1D(sp, vp):
     
     # 6. current and time characteristics --------------------------------------------------------------
 
+    tStart = time.time()
+    Hp = np.zeros((1,1))                # initialization as empty np array to allow saving results even if no parasitics filtering is calculated
     if sp['odeSolver'] == 'Finite Diff.':
         dt = sp['dtFD']
     else:
         dt = sp['dt']
 
     teval = np.arange(0, sp['tmax'], dt)
-    ct = len(teval)
+    n = len(teval)
+
+    minGrad = (sp['Ion']-sp['Ioff']) * dt * 1e7 # min change of signal defining beginning of pulse (for step and pulse), accounting for different timesteps
 
     if sp['modFormat'] == 'step':
-        It = np.ones((ct)) * sp['Ion']  # current vector
-        It[0] = 0                       # to calculate NSinit@I(t0)=0
+        It = np.zeros((2 * n))  # current vector of twice the length (FFT requires symetrical signal around zero)
+        It[n:] = sp['Ion']
+        if sp['Parasitics'] == True:
+            Hp, It = parasiticsFilter(dt, 2*n, vp['Cp'], vp['Rm'], vp['Ca'], vp['Ra'], It)
+        
+        # quick&dirty fix for unexplained time-domain shift of the filtered signal (FFT phase?)
+        sStart = np.where(np.gradient(It) > minGrad)    # sStart is a tuple -> sStart[0] returns an array, sStart[0][0] the first element of that array
+        It = It[sStart[0][0]:sStart[0][0] + n]
+        It[0] = 0                                       # to calculate NSinit@I(t0)=0
 
     elif sp['modFormat'] == 'pulse':
-        It = np.ones((ct)) * sp['Ion']  # current vector
-        It[int(ct/2):] =  sp['Ioff']
-        It[0] = sp['Ioff']              # to compute NSinit@I(t0)=0
+        It = np.ones((2 * n)) * sp['Ioff']              # current vector of twice the length (FFT requires symetrical signal around zero)
+        It[n//2:n] =  sp['Ion']
+        if sp['Parasitics'] == True:
+            Hp, It = parasiticsFilter(dt, 2*n, vp['Cp'], vp['Rm'], vp['Ca'], vp['Ra'], It)
+        
+        # quick&dirty fix for unexplained time-domain shift of the filtered signal (FFT phase?)
+        sStart = np.where(np.gradient(It)>minGrad)      # sStart is a tuple -> sStart[0] returns an array, sStart[0][0] the first element of that array
+        It = It[sStart[0][0]:sStart[0][0] + n]
+        It[0] = sp['Ioff']                              # to compute NSinit@I(t0)=Ioff
 
     elif sp['modFormat'] == 'random bits':
         nb = int(sp['tmax'] / sp['tb']) # number of bits
         sequence = np.random.randint(2, size = nb)
         cb = int(sp['tb'] / dt)         # number of time steps for one bit
-        It = np.ones((ct)) * sp['Ion']  # current vector
+        It = np.ones((n)) * sp['Ion']   # current vector
         for i in range(nb):
             It[i * cb : (i + 1) * cb] = It[i * cb : (i + 1) * cb] - (sp['Ion'] - sp['Ioff']) * sequence[i]
+        if sp['Parasitics'] == True:
+            Hp, It = parasiticsFilter(dt, n, vp['Cp'], vp['Rm'], vp['Ca'], vp['Ra'], It)
 
     elif sp['modFormat'] == 'small signal':
         if sp['Hfplot'] == True:        # tmax disabled and calculated automatically
-            ct = sp['ctH'] + 1          # e.g. ctH = 2**14 = 16'384 points -> df = 1/dt/ct = 1/tmax = 62 MHz for dt = 1ps (typical for FD) or 6mHz for dt = 10ps
-            sp['tmax'] = ct * dt
+            n = sp['nH'] + 1            # e.g. nH = 2**14 = 16'384 points -> df = 1/dt/n = 1/tmax = 62 MHz for dt = 1ps (typical for FD) or 6mHz for dt = 10ps
+            sp['tmax'] = n * dt
         teval = np.arange(0, sp['tmax'], dt)
-        It = np.ones((ct)) * (sp['Ion'] + sp['Iss'])
+        It = np.ones((n)) * (sp['Ion'] + sp['Iss'])
         It[0] = sp['Ion']               # to compute NSinit@I(t0)=Ion
+        if sp['Parasitics'] == True:
+            Hp, _ = parasiticsFilter(dt, n, vp['Cp'], vp['Rm'], vp['Ca'], vp['Ra'], It) # in the small signal case, the signal is not affected to depict the intrinsic frequency response (parasitics contribution added separately on the plot)
 
     elif sp['modFormat'] == 'steady state':
         if sp['RINplot'] == True:       # tmax disabled and calculated automatically
-            ct = sp['nSeg'] * sp['ctRIN'] # 8 segments of length e.g. ctRIN = 2**15 = 32'768 each  -> 8* 32.75ns = 262ns, df = 1/dt/ct = 1/tmax = 31 MHz (for dt = 1ps)
-            sp['tmax'] = ct * dt
+            n = sp['nSeg'] * sp['nRIN'] # 8 segments of length e.g. nRIN = 2**15 = 32'768 each  -> 8* 32.75ns = 262ns, df = 1/dt/n = 1/tmax = 31 MHz (for dt = 1ps)
+            sp['tmax'] = n * dt
         teval = np.arange(0, sp['tmax'], dt)
-        It = np.ones((ct)) * sp['Ion']  # current vector
+        It = np.ones((n)) * sp['Ion']   # current vector
+    tEnd = time.time()
+    print(f'Current signal generation: {np.round(tEnd - tStart, 3)}s')
 
+       
     # 7. steady-state (LI) solution --------------------------------------------------------------------
 
     tStart = time.time() 
@@ -476,7 +526,7 @@ def VISTAS1D(sp, vp):
         b[1:nNb+nNw,0] = -c_injw.reshape((-1,)) * c_injb / Vr * Icw[1]
         NScw[1:, 1] = np.linalg.solve(A[1:, 1:], b[1:,:]).reshape((-1,))    # first row and column (related to Nb) removed from A and b matrices
 
-    # main solver loop: sol@I0: 0, sol@I1: NScw[:, 1] calculated analytically above, sol@I3...ct calculated below using fsolve and Jacobian
+    # main solver loop: sol@I0: 0, sol@I1: NScw[:, 1] calculated analytically above, sol@I3...n calculated below using fsolve and Jacobian
     for i in range(2, Icw.shape[0], 1):
         args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Icw[i], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)
         NScw[:, i] = fsolve(cw_1D_transp, NScw[:, i-1], args = args, fprime = Jac_cw_1D_transp)
@@ -489,9 +539,9 @@ def VISTAS1D(sp, vp):
     # 8. solver main loop ------------------------------------------------------------------------------
 
     tStart = time.time() 
-    Nb = np.zeros((nNb, ct))            # Nb(t)
-    Nw = np.zeros((nNw, ct))            # Nw0(t), Nw1(t), ..., NnNw(t)
-    S = np.zeros((nS, ct))              # multimode photon number matrix
+    Nb = np.zeros((nNb, n))            # Nb(t)
+    Nw = np.zeros((nNw, n))            # Nw0(t), Nw1(t), ..., NnNw(t)
+    S = np.zeros((nS, n))              # multimode photon number matrix
 
     FS = np.zeros((nS, 1))              # modal noise terms
 
@@ -511,7 +561,7 @@ def VISTAS1D(sp, vp):
         Nw[:, 0] = NSinit[1:nNb+nNw]    # first point initialized at the LI value: Nw @ I(t=0)
         S[:, 0] = NSinit[nNb+nNw:]      # first point initialized at the LI value: Sm @ I(t=0)
      
-        for ti in range(ct - 1):
+        for ti in range(n - 1):
             Nbto[0, 0] = Nb[0, ti]
             Nwto[:, 0] = Nw[:, ti]
             Sto[:, 0] = S[:, ti]
@@ -545,13 +595,13 @@ def VISTAS1D(sp, vp):
 
         if sp['Hfplot'] == True:   # must be calculated prior to subsampling
             tStart = time.time()
-            f, H = FreqResp(S[:, 1:], S2P, ct-1, dt)    # compute frequency response
+            f, H, Hp = HfResp(S[:, 1:], n-1, dt, sp['fmaxplot'], sp['Parasitics'], Hp)  # compute frequency response
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
         if sp['RINplot'] == True:
             tStart = time.time()
-            f, RIN = RINcalc(np.sum(S* S2P, 0) , ct, dt, sp['nSeg'], fmax=20e9)  # compute RIN spectrum
+            f, RIN = RINcalc(np.sum(S* S2P, 0), n, dt, sp['nSeg'], sp['fmaxplot'])      # compute RIN spectrum
             tEnd = time.time()
             print(f'RIN calculation: {np.round(tEnd - tStart, 3)}s')
 
@@ -560,7 +610,7 @@ def VISTAS1D(sp, vp):
         Nw = Nw[:, ::int(sp['dt']/dt)]
         S = S[:, ::int(sp['dt']/dt)]
         teval = teval[::int(sp['dt']/dt)]
-        ct = len(teval)
+        n = len(teval)
         dt = sp['dt']
  
     else:   # 8b.solution of system of ODEs using 'solve_ivp'
@@ -580,11 +630,11 @@ def VISTAS1D(sp, vp):
 
         if sp['modFormat'] == 'small signal':
             tStart = time.time()
-            f, H = FreqResp(S[:,1:], S2P, ct-1, dt)     # compute frequency response
+            f, H, Hp = HfResp(S[:, 1:], n-1, dt, sp['fmaxplot'], sp['Parasitics'], Hp)    # compute frequency response
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
-    return rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
+    return rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
 
     
 def main():
