@@ -83,8 +83,8 @@ def save_params(sp, vp, sr, file_name):
 
 # GUI/params mgmt: update dictionaries sp and vp on event, check type, adjust units
 def update_dict(values, d):
-    for k, v in d.items():                      # update entire dictionary...
-        if not k in ['ctH', 'ctRIN', 'nSeg']:   # ... except for the three parameters that are in the dictionary and json params files, but not in the GUI 
+    for k, v in d.items():                              # update entire dictionary...
+        if not k in ['nH', 'nRIN', 'nSeg', 'fmaxplot']: # ... except for the "hyperparameters" that are in the dictionary and json params files, but not in the GUI 
             k, d[k] = check_value(k, values[k])
     return d
 
@@ -175,6 +175,8 @@ def manage_params_combos(window, values):
         values['Hfplot'] = False
         window['Eyeplot'].Update(False)
         values['Eyeplot'] = False
+        window['Parasitics'].Update(False)
+        values['Parasitics'] = False
 
     # forces modeFormat = 'random bits' when plotting eye is selected
     if values['Eyeplot'] == True:
@@ -195,7 +197,7 @@ def manage_params_combos(window, values):
 # GUI/params mgmt: update gui (incl. disabling elements) after initializing or loading params file
 def update_gui(window, values, sp, vp):
     for k, v in sp.items():                     # update GUI with values stored in the simParams dictionary...
-        if not k in ['ctH', 'ctRIN', 'nSeg']:   # ... except for the three parameters that are in the dictionary and json params files, but not in the GUI 
+        if not k in ['nH', 'nRIN', 'nSeg', 'fmaxplot']:   # ... except for the "hyperparameters" that are in the dictionary and json params files, but not in the GUI 
             if k in ['tmax', 'dt', 'dtFD', 'tb']:
                 values[k] = sp[k] * 1e9         # convert s to ns
             elif k in ['Ion', 'Ioff', 'Iss']:
@@ -228,13 +230,13 @@ def GUI():
             [sg.Checkbox('Carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
             [sg.Checkbox('Thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
             [sg.Checkbox('Noise', key='Noise', default=sp['Noise'], disabled=False, tooltip=ttips['Noise'], enable_events=True)],
-            [sg.Checkbox('Electrical parasitics', key='Parasitics', default=sp['Parasitics'], disabled=True, tooltip=ttips['Parasitics'], enable_events=True)],
+            [sg.Checkbox('Electrical parasitics', key='Parasitics', default=sp['Parasitics'], tooltip=ttips['Parasitics'], enable_events=True)],
             [sg.Checkbox('2D', key='2D', default=sp['2D'], disabled=True, tooltip=ttips['2D'], enable_events=True)],
             ])],
         [sg.Frame('Simulation parameters',[
             [sg.InputText(sp['nNw'], key='nNw', size=(7,1), tooltip=ttips['nNw'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
             #[sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
-            [sg.Combo(values=('RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA', 'Finite Diff.'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
+            [sg.Combo(values=('Finite Diff.', 'RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
             [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['Hfplot']==True or sp['RINplot']==True), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
             [sg.InputText(round(float(0 if sp['dt'] is None else sp['dt'])*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
             [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
@@ -288,12 +290,18 @@ def GUI():
             ])],
         [sg.Frame('Carrier transport and diffusion parameters',[
             [sg.InputText(vp['tauNb'], key='tauNb', size=(7,1), tooltip=ttips['tauNb'], enable_events=True), sg.Text('tauNb: carrier lifetime in the barriers (s)', size=(40,1))],
-            [sg.InputText(vp['tauNw'], key='tauNw', size=(7,1), tooltip=ttips['tauNw'], enable_events=True), sg.Text('tauNw: carrier lifetime in the QWs (s)', size=(40,1))],
+            [sg.InputText(vp['tauNw'], key='tauNw', size=(7,1), tooltip=ttips['tauNw'], enable_events=True), sg.Text('tauNw: carrier lifetime in the QWs (s)')],
             [sg.InputText(vp['tauCap'], key='tauCap', size=(7,1), tooltip=ttips['tauCap'], enable_events=True), sg.Text('tauCap: ambipolar diffusion time (s)')],
-            [sg.InputText(vp['tauEsc'], key='tauEsc', size=(7,1), tooltip=ttips['tauEsc'], enable_events=True), sg.Text('tauEsc: thermionic emission lifetime (s)', size=(40,1))],
+            [sg.InputText(vp['tauEsc'], key='tauEsc', size=(7,1), tooltip=ttips['tauEsc'], enable_events=True), sg.Text('tauEsc: thermionic emission lifetime (s)')],
             [sg.InputText(vp['etai'], key='etai', size=(7,1), tooltip=ttips['etai'], enable_events=True), sg.Text('etai: current injection efficiency')],
             [sg.InputText(vp['rs'], key='rs', size=(7,1), tooltip=ttips['rs'], enable_events=True), sg.Text('rs: current spreading coefficient (cm)')],
             [sg.InputText(vp['DN'], key='DN', size=(7,1), tooltip=ttips['DN'], enable_events=True), sg.Text('DN: ambipolar diffusion coeff. (cm2/s)')],
+            ])],
+        [sg.Frame('Electrical parasitic elements',[
+            [sg.InputText(vp['Cp'], key='Cp', size=(7,1), tooltip=ttips['Cp'], enable_events=True), sg.Text('CP: pad parasitic capacitance (H)', size=(40,1))],
+            [sg.InputText(vp['Rm'], key='Rm', size=(7,1), tooltip=ttips['Rm'], enable_events=True), sg.Text('Rm: bragg reflectors parasitic resistance (ohm)')],
+            [sg.InputText(vp['Ca'], key='Ca', size=(7,1), tooltip=ttips['Ca'], enable_events=True), sg.Text('Ca: active region parasitic capacitance (H)')],
+            [sg.InputText(vp['Ra'], key='Ra', size=(7,1), tooltip=ttips['Ra'], enable_events=True), sg.Text('Ra: active region parasitic resistance (ohm)')],
             ])],
         ]
 
@@ -318,7 +326,7 @@ def GUI():
 
         elif event == 'initialize params':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -331,7 +339,7 @@ def GUI():
 
         elif event == 'load file':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -362,6 +370,7 @@ def GUI():
                     "teval": teval.tolist(),
                     "f": f.tolist(),
                     "H": H.tolist(),
+                    "Hp": Hp.tolist(),
                     "RIN": RIN.tolist(),
                     "S2P": S2P.tolist(),
                     "Nb": Nb.tolist(),
@@ -377,9 +386,9 @@ def GUI():
         elif event == 'run simulation':
             save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             
-            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
+            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
             
             # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
             sp['tmax'] = round(max(teval * 1e9), 0) * 1e-9
@@ -400,10 +409,10 @@ def GUI():
                 plotEye(teval, sp['dt'], sp['tb'], S2P*S)
 
             if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
-                plotSpectrum(f, H, 'frequency response (dB)', 0, 15, -10, 10)
+                plotH(f, H, sp['Parasitics'], Hp, 0, 15, -10, 10)
 
             if sp['Noise'] == True and sp['RINplot'] == True:
-                plotSpectrum(f, RIN, 'Relative Intensity Noise (dB/Hz)', 0, 15, -160, -100)
+                plotRIN(f, RIN, 0, 15, -160, -100)
 
         else:   # case 'gui-element change'
             values = manage_params_combos(window, values)   # update GUI based on params combos
