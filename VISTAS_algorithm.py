@@ -32,8 +32,8 @@ from scipy.fft import fft, ifft, fftshift, fftfreq
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
-#from scipy.optimize import check_grad
-#from scipy.signal import savgol_filter
+# from scipy.optimize import check_grad
+# from scipy.signal import savgol_filter
 from scipy.special import jn
 from scipy.special import jn_zeros
 
@@ -376,7 +376,7 @@ def VISTAS1D(sp, vp):
     beta = vp['beta'] / nS * np.ones((nS, 1))   # division by nS to spread the spontaneous emission homogeneously over all modes (-> not additive!)
     GamZ = GamZ * np.ones((nS, 1))
     tEnd = time.time()
-    print(f'Mode profiles computation: {np.round(tEnd - tStart, 3)}s')
+    print(f'Mode profiles computation ({nS} modes): {np.round(tEnd - tStart, 3)}s')
 
     # 3. radial injection current profile --------------------------------------------------------------
 
@@ -423,7 +423,7 @@ def VISTAS1D(sp, vp):
     
     tEnd = time.time()
     print(f'Overlap parameters computation: {np.round(tEnd - tStart, 3)}s') 
-    
+
     # 5. temp optical parameters derivation ------------------------------------------------------------
     
     tauS = 1 / vg / (alpham + alphai) # photon lifetime (to calculate the Rolo - the optical losses and outcoupling)
@@ -610,15 +610,16 @@ def VISTAS1D(sp, vp):
         Nw = Nw[:, ::int(sp['dt']/dt)]
         S = S[:, ::int(sp['dt']/dt)]
         teval = teval[::int(sp['dt']/dt)]
+        It = It[::int(sp['dt']/dt)]
         n = len(teval)
         dt = sp['dt']
  
     else:   # 8b.solution of system of ODEs using 'solve_ivp'
 
         tStart = time.time()        
-        It = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
+        Itinterp = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
         
-        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, It, c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)       
+        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Itinterp, c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)       
         sol = solve_ivp(ODEsolver_1D_transp, (0, sp['tmax']), NSinit, t_eval=teval, method=sp['odeSolver'], dense_output=True, vectorized=True, args=args, rtol=1e-6, atol=1e-6, jac=Jac_1D_transp)
 
         Nb = sol.y[0]
@@ -634,7 +635,7 @@ def VISTAS1D(sp, vp):
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
-    return rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
+    return rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
 
     
 def main():

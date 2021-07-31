@@ -32,7 +32,7 @@ from VISTAS_visualization import *
 # GUI/params mgmt: check the type and correct the unit (ns->s, mA->A) to make sure correct values are stored in the dictionaries sp and vp
 def check_value(k, v):
 
-    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'Uxyplot', 'PIplot', 'Ptplot', 'NSxyplot', 'RINplot', 'Hfplot', 'Eyeplot']:
+    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'Modes2Dplot', 'PIplot', 'Ptplot', 'NwS2Dplot', 'RINplot', 'Hfplot', 'Eyeplot']:
         try:
             v = bool(v)
         except:
@@ -175,8 +175,6 @@ def manage_params_combos(window, values):
         values['Hfplot'] = False
         window['Eyeplot'].Update(False)
         values['Eyeplot'] = False
-        window['Parasitics'].Update(False)
-        values['Parasitics'] = False
 
     # forces modeFormat = 'random bits' when plotting eye is selected
     if values['Eyeplot'] == True:
@@ -249,10 +247,10 @@ def GUI():
             [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9,1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
             ])],
         [sg.Frame('Results visualization',[
-            [sg.Checkbox('2D mode profiles', key='Uxyplot', default=sp['Uxyplot'], size=(45,1), tooltip=ttips['Uxyplot'], enable_events=True)],
+            [sg.Checkbox('2D mode profiles', key='Modes2Dplot', default=sp['Modes2Dplot'], size=(45,1), tooltip=ttips['Modes2Dplot'], enable_events=True)],
             [sg.Checkbox('Steady-state (LI) characteristic Popt(I)', key='PIplot', default=sp['PIplot'], size=(45,1), tooltip=ttips['PIplot'], enable_events=True)],
             [sg.Checkbox('Dynamic characteristic Popt(t)', key='Ptplot', default=sp['Ptplot'], tooltip=ttips['Ptplot'], enable_events=True)],
-            [sg.Checkbox('2D optical & carrier profiles within the cavity', key='NSxyplot', default=sp['NSxyplot'], disabled=True, size=(45,1), tooltip=ttips['NSxyplot'], enable_events=True)],
+            [sg.Checkbox('2D optical & carrier profiles within the cavity', key='NwS2Dplot', default=sp['NwS2Dplot'], size=(45,1), tooltip=ttips['NwS2Dplot'], enable_events=True)],
             [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RINplot', default=sp['RINplot'], disabled=(sp['Noise']!=True), tooltip=ttips['RINplot'], enable_events=True)],
             [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['Noise']==True), tooltip=ttips['Hfplot'], enable_events=True)],
             [sg.Checkbox('Eye diagram', key='Eyeplot', default=sp['Eyeplot'], tooltip=ttips['Eyeplot'], enable_events=True)],
@@ -326,7 +324,7 @@ def GUI():
 
         elif event == 'initialize params':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -339,7 +337,7 @@ def GUI():
 
         elif event == 'load file':
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             if 'sr' in locals():    
                 del sp, vp, sr
             else:
@@ -361,12 +359,14 @@ def GUI():
                     "rho": rho.tolist(),
                     "nrho": nrho,
                     "nNw": nNw,
+                    "J0i": J0i.tolist(),
                     "nS": nS,
                     "LPlm": LPlm,
                     "lvec": lvec.tolist(),
                     "Ur": Ur.tolist(),
                     "Icw": Icw.tolist(),
                     "NScw": NScw.tolist(),
+                    "It": It.tolist(),
                     "teval": teval.tolist(),
                     "f": f.tolist(),
                     "H": H.tolist(),
@@ -386,33 +386,43 @@ def GUI():
         elif event == 'run simulation':
             save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
             if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
+                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
             
-            rho, nrho, phi, nphi, nNw, nS, LPlm, lvec, Ur, Icw, NScw, f, H, Hp, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
+            rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
             
             # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
             sp['tmax'] = round(max(teval * 1e9), 0) * 1e-9
             window['tmax'].Update(int(sp['tmax'] * 1e9))
             values['tmax'] = int(sp['tmax'] * 1e9)
             
-            # visualization
-            if sp['Uxyplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
-                plot2D(Ur, LPlm, lvec, nS, rho*1e-2, nrho, phi, nphi, nfig = 1)              
+            # visualization            
+            try:     # popup to collect figure number; 1 if invalid input
+                nfig = int(sg.popup_get_text(message= 'First figure number', title='', default_text='', size=(2, 1), no_titlebar = False, keep_on_top = True))
+            except:
+                nfig = 1
+
+            if sp['Modes2Dplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
+                nfig = plotModes2D(Ur, LPlm, lvec, nS, rho*1e-2, nrho, phi, nphi, nfig=nfig)              
         
             if sp['PIplot'] == 1:   # steady-state LI characteristic Popt(I)
-                plotPower(Icw * 1e3, S2P*NScw[NScw.shape[0]-nS:,:], LPlm, xlabel = 'current (mA)')  
+                nfig = plotPower(Icw * 1e3, S2P*NScw[NScw.shape[0]-nS:,:], LPlm, xlabel = 'current (mA)', nfig=nfig)  
 
             if sp['Ptplot'] == 1:   # dynamic response Popt(t)
-                plotPower(teval * 1e9, S2P*S, LPlm, xlabel = 'time (ns)')
+                nfig = plotPower(teval * 1e9, S2P*S, LPlm, xlabel = 'time (ns)', nfig=nfig)
+
+            if sp['NwS2Dplot'] == 1: # carrier and optical field profiles in the cavity
+                nfig = plotNwS2D(Nw[:, -1], J0i, S[:, -1], Ur, rho*1e-2, nrho, phi, nphi, nfig=nfig) # by default the last point of Nw
                 
             if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == True:
-                plotEye(teval, sp['dt'], sp['tb'], S2P*S)
+                nfig = plotEye(teval, sp['dt'], sp['tb'], S2P*S, It, nfig=nfig)
 
             if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
-                plotH(f, H, sp['Parasitics'], Hp, 0, 15, -10, 10)
+                nfig = plotH(f, H, sp['Parasitics'], Hp, 0, 15, -10, 10, nfig=nfig)
 
             if sp['Noise'] == True and sp['RINplot'] == True:
-                plotRIN(f, RIN, 0, 15, -160, -100)
+                nfig = plotRIN(f, RIN, 0, 15, -160, -100, nfig=nfig)
+
+            plt.show(block = False)
 
         else:   # case 'gui-element change'
             values = manage_params_combos(window, values)   # update GUI based on params combos
