@@ -37,21 +37,21 @@ def check_value(k, v):
             v = bool(v)
         except:
             #sg.popup('Bool input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
-            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
 
     elif k in ['odeSolver', 'modFormat', 'vcselDescr']:
         try:
             v = str(v)
         except:
             #sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
-            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
 
     elif k == 'nNw':
         try:
             v = int(v)
         except:
             #sg.popup('Integer input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
-            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
     else:
         try:
             v = float(v)
@@ -61,7 +61,7 @@ def check_value(k, v):
                 v = round(v * 1e-3, 5)
         except:
             #sg.popup('Float input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
-            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (jsaon: null)
+            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
 
     return k, v
  
@@ -92,7 +92,11 @@ def update_dict(values, d):
 # GUI/params mgmt: disable elements not used for certain combinations of parameters
 def manage_params_combos(window, values):
 
-    # simulation parameters
+    # forces Finite Diff. as ODE solver if noise is selected
+    if values['Noise'] == True:
+        values['odeSolver'] = 'Finite Diff.'
+
+    # forces smaller timestep dtFD for Finite Diff. solver
     if values['odeSolver'] == 'Finite Diff.':
         window['dtFD'].Update(disabled = False)
     else:
@@ -103,91 +107,69 @@ def manage_params_combos(window, values):
         window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = True)
         window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
+        window['RINplot'].Update(disabled = True)
+        values['RINplot'] = False       # when enabling the element again, it should not be checked
+        window['Hfplot'].Update(disabled = True)
+        values['Hfplot'] = False        # when enabling the element again, it should not be checked
+        window['Eyeplot'].Update(disabled = True)
+        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
     
     elif values['modFormat'] == 'pulse':
         window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = True)
+        window['RINplot'].Update(disabled = True)
+        values['RINplot'] = False       # when enabling the element again, it should not be checked
+        window['Hfplot'].Update(disabled = True)
+        values['Hfplot'] = False        # when enabling the element again, it should not be checked
+        window['Eyeplot'].Update(disabled = True)
+        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+
+    elif values['modFormat'] == 'steady state':
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)
+        window['Hfplot'].Update(disabled = True)
+        values['Hfplot'] = False        # when enabling the element again, it should not be checked
+        window['Eyeplot'].Update(disabled = True)
+        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+        if values['Noise'] == True:
+            window['RINplot'].Update(disabled = False)
+        else:
+            window['RINplot'].Update(disabled = True)
+            values['RINplot'] = False   # when enabling the element again, it should not be checked
+
+    elif values['modFormat'] == 'small signal':
+        window['Ioff'].Update(disabled = True)
+        window['Iss'].Update(disabled = False)
+        window['tb'].Update(disabled = True)
+        window['RINplot'].Update(disabled = True)
+        values['RINplot'] = False       # when enabling the element again, it should not be checked
+        window['Eyeplot'].Update(disabled = True)
+        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+        if values['Noise'] == False:
+            window['Hfplot'].Update(disabled = False)
+        else:
+            window['Hfplot'].Update(disabled = True)
+            values['Hfplot'] = False    # when enabling the element again, it should not be checked
 
     elif values['modFormat'] == 'random bits':
         window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = False)
-
-    elif values['modFormat'] == 'small signal':
-        if values['Hfplot'] == True:
-            window['tmax'].Update(disabled = True)
-        else:
-            window['tmax'].Update(disabled = False)
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = False)
-        window['tb'].Update(disabled = True)
-
-    elif values['modFormat'] == 'steady state':
-        if values['RINplot'] == True:
-            window['tmax'].Update(disabled = True)
-        else:
-            window['tmax'].Update(disabled = False)
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)      
-
-    # forces FD solution and disables freq resp calculation for simulations including noise
-    if values['Noise'] == True:
-        window['RINplot'].Update(disabled = False)
-        window['Hfplot'].Update(False)
-        values['Hfplot'] = False
-        window['Hfplot'].Update(disabled = True)
-        window['odeSolver'].Update('Finite Diff.')
-        values['odeSolver'] = 'Finite Diff.'
-        window['dtFD'].Update(disabled = False)
-    else:
-        window['RINplot'].Update(False)
-        values['RINplot'] = False
         window['RINplot'].Update(disabled = True)
-        window['Hfplot'].Update(disabled = False)
+        values['RINplot'] = False       # when enabling the element again, it should not be checked
+        window['Hfplot'].Update(disabled = True)
+        values['Hfplot'] = False        # when enabling the element again, it should not be checked
+        window['Eyeplot'].Update(disabled = False)
 
-    # forces modeFormat to 'small signal' when plotting freq resp is selected
-    if values['Hfplot'] == True:
-        window['modFormat'].Update('small signal')
-        values['modFormat'] = 'small signal'
+    # disables tmax if defined automatically by the algorithm (for RIN and H)
+    if values['RINplot'] == True or values['Hfplot']== True:
         window['tmax'].Update(disabled = True)
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = False)
-        window['tb'].Update(disabled = True)
-        window['RINplot'].Update(False)
-        values['RINplot'] = False
-        window['Eyeplot'].Update(False)
-        values['Eyeplot'] = False
-
-    # forces modeFormat to 'steady state' when plotting RIN is selected
-    if values['RINplot'] == True:
-        window['modFormat'].Update('steady state')
-        values['modFormat'] = 'steady state'
-        window['tmax'].Update(disabled = True)
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
-        window['Hfplot'].Update(False)
-        values['Hfplot'] = False
-        window['Eyeplot'].Update(False)
-        values['Eyeplot'] = False
-
-    # forces modeFormat = 'random bits' when plotting eye is selected
-    if values['Eyeplot'] == True:
-        window['modFormat'].update('random bits')
-        values['modFormat'] = 'random bits'
+    else:
         window['tmax'].Update(disabled = False)
-        window['Ioff'].Update(disabled = False)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = False)
-        window['RINplot'].Update(False)
-        values['RINplot'] = False
-        window['Hfplot'].Update(False)
-        values['Hfplot'] = False
 
     return values
 
@@ -227,7 +209,7 @@ def GUI():
         [sg.Frame('Simulated effects',[
             [sg.Checkbox('Carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
             [sg.Checkbox('Thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
-            [sg.Checkbox('Noise', key='Noise', default=sp['Noise'], disabled=False, tooltip=ttips['Noise'], enable_events=True)],
+            [sg.Checkbox('Noise', key='Noise', default=sp['Noise'], tooltip=ttips['Noise'], enable_events=True)],
             [sg.Checkbox('Electrical parasitics', key='Parasitics', default=sp['Parasitics'], tooltip=ttips['Parasitics'], enable_events=True)],
             [sg.Checkbox('2D', key='2D', default=sp['2D'], disabled=True, tooltip=ttips['2D'], enable_events=True)],
             ])],
@@ -240,11 +222,11 @@ def GUI():
             [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
             ])],
         [sg.Frame('Current modulation pattern',[
-            [sg.Combo(values=('step', 'pulse', 'random bits', 'small signal', 'steady state'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
-            [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3,1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
-            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3,1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']=='small signal' or sp['modFormat']=='step'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
-            [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3,2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
-            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9,1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
+            [sg.Combo(values=('step', 'pulse', 'steady state', 'small signal', 'random bits'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
+            [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3, 1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
+            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3, 1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']=='small signal' or sp['modFormat']=='step'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
+            [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3, 2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
+            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9, 1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
             ])],
         [sg.Frame('Results visualization',[
             [sg.Checkbox('2D mode profiles', key='Modes2Dplot', default=sp['Modes2Dplot'], size=(45,1), tooltip=ttips['Modes2Dplot'], enable_events=True)],
@@ -428,7 +410,7 @@ def GUI():
             values = manage_params_combos(window, values)   # update GUI based on params combos
             sp = update_dict(values, sp)                    # update dictionary
             vp = update_dict(values, vp)                    # update dictionary
-            #update_gui(window, values, sp, vp)
+            update_gui(window, values, sp, vp)
 
 
 def main():
