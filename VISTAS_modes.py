@@ -23,16 +23,15 @@
 ##################################################################################
 
 import numpy as np
-import scipy as sp
-import matplotlib.pyplot as plt
 from scipy.optimize import fsolve
+from scipy.special import jv, kv, jn_zeros
 import warnings
 
-def LP_modes(wLength, nc, dn, rCore, nrho, rho, alpha):
+def LP_modes(wl0, nc, dn, rCore, nrho, rho, alpha):
 
     # STEP 1. calculate normalized cutoff frequencies and derive corresponding modes LPlm
     
-    V = 2 * np.pi * rCore / wLength * nc * np.sqrt(2 * dn)    # normalized frequency for the specified waveguide
+    V = 2 * np.pi * rCore / wl0 * nc * np.sqrt(2 * dn)    # normalized frequency for the specified waveguide
 
     lmax = 100
     mmax = 50
@@ -41,9 +40,9 @@ def LP_modes(wLength, nc, dn, rCore, nrho, rho, alpha):
     mvec = ind[1].flatten('C') + 1  # +1 to shift m (0 -> 1)
 
     VC = np.zeros((lmax, mmax))       # matrix with Vcutoff values stored along dimensions l and m (NB. l starts at zero, m at one)
-    VC[0, 1 : mmax + 1] = np.round(sp.special.jn_zeros(1, mmax - 1), 5) # for l=0, Vcutoff as roots of J1(V) = 0, 1:max(mvec)-1 to account for added zero root not outputed by jn_zeros
+    VC[0, 1 : mmax + 1] = np.round(jn_zeros(1, mmax - 1), 5) # for l=0, Vcutoff as roots of J1(V) = 0, 1:max(mvec)-1 to account for added zero root not outputed by jn_zeros
     for l in range(1, lmax):
-        VC[l, :] = np.round(sp.special.jn_zeros(l - 1, mmax), 5)        # for l!=0, Vcutoff given by the roots of Jl-1(V) = 0
+        VC[l, :] = np.round(jn_zeros(l - 1, mmax), 5)        # for l!=0, Vcutoff given by the roots of Jl-1(V) = 0
     
     vc = VC.flatten('C')    # cutoff matrix flattened into a vector
     
@@ -66,8 +65,7 @@ def LP_modes(wLength, nc, dn, rCore, nrho, rho, alpha):
 
     # STEP 2. Find roots u of dispersion equation, and format them into a 2D array along the axes l and m
 
-    eigenValLP = lambda u, l: u * sp.special.jv(l+1, u) / sp.special.jv(l, u) - np.sqrt(V**2 - u**2) * sp.special.kv(
-            l+1, np.sqrt(V**2 - u**2)) / sp.special.kv(l, np.sqrt(V**2 - u**2))  # Eigenvalue equation for LP modes
+    eigenValLP = lambda u, l: u * jv(l+1, u) / jv(l, u) - np.sqrt(V**2 - u**2) * kv(l+1, np.sqrt(V**2 - u**2)) / kv(l, np.sqrt(V**2 - u**2))  # Eigenvalue equation for LP modes
     
     u = np.zeros((max(lvec) + 1, max(mvec) + 1))                # 2D (l, m) array storing the roots of the eigenvalue equation for each LPlm mode
     warnings.filterwarnings('ignore', category=RuntimeWarning)  # prevents warning about np.sqrt(V**2 - u**2) when V < u
@@ -100,32 +98,36 @@ def LP_modes(wLength, nc, dn, rCore, nrho, rho, alpha):
 
     # STEP 3. Construct radial modal profiles based on roots found in step 2
 
-    ur = np.zeros((nm, nrho))                 # radial modal intensity
+    ur = np.zeros((nm, nrho))               # radial modal intensity
     rBoundary = np.argmax(rho >= rCore)
-
+    wl = np.zeros((nm, 1))                  # modal wavelengths vector
+    ncl = np.sqrt(nc**2 - 2 * dn * nc**2)   # effective cladding refractive index derived from dn: dn = (nc^2 - ncl^2)/2/nc^2
     for m in range(nm):
         um = u[lvec[m], mvec[m]]
         if um != 0:
             wm = np.sqrt(V**2 - um**2)
-            ur[m, :rBoundary] = sp.special.jv(lvec[m], um * rho[:, :rBoundary] / rCore) / sp.special.jv(lvec[m], um)   # profile in core
-            ur[m, rBoundary:] = sp.special.kv(lvec[m], wm * rho[:, rBoundary:] / rCore) / sp.special.kv(lvec[m], wm)   # profile in cladding
+            ur[m, :rBoundary] = jv(lvec[m], um * rho[:, :rBoundary] / rCore) / jv(lvec[m], um)   # profile in core
+            ur[m, rBoundary:] = kv(lvec[m], wm * rho[:, rBoundary:] / rCore) / kv(lvec[m], wm)   # profile in cladding
+            wl[m] = wl0 - wl0 * um**2 * (nc-ncl) / nc / (um**2 + wm**2)
         else:
             print(f'no root found for mode LP{lvec[m]}{mvec[m]}')
 
-    return nm, lvec, LPlm, ur
+    return nm, lvec, LPlm, ur, wl
 
 
 def main():
     
-    wLength = 858e-9
-    rCore = 8e-6
+    import matplotlib.pyplot as plt
+
+    wl0 = 850e-9
+    rCore = 3.5e-6
     nc = 3.6
-    dn = .001
+    dn = .002
     nrho = 100
     rho = np.linspace(0, 2.5*rCore, nrho)
     rho = rho[:, np.newaxis]    # np rank one array -> (1, nrho) vector
 
-    nm, lvec, LPlm, ur = LP_modes(wLength, nc, dn, rCore, nrho, rho.T, alpha = 10)
+    nm, lvec, LPlm, ur, wl = LP_modes(wl0, nc, dn, rCore, nrho, rho.T, alpha = 10)
 
     plt.plot(rho, ur.T) #plot field profiles
     plt.legend(LPlm)

@@ -361,7 +361,7 @@ def VISTAS1D(sp, vp):
 
     # field profiles
     tStart = time.time()    
-    nS, lvec, LPlm, ur = LP_modes(vp['wl0']* 1e-9, vp['nc'], vp['dn'], vp['rox'] * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
+    nS, lvec, LPlm, ur, wl = LP_modes(vp['wl0']* 1e-9, vp['nc'], vp['dn'], vp['rox'] * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
 
     # normalized intensity profiles
     Ur = np.square(ur)  # field amplitude -> intensity
