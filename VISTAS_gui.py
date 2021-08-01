@@ -86,6 +86,7 @@ def update_dict(values, d):
     for k, v in d.items():                              # update entire dictionary...
         if not k in ['nH', 'nRIN', 'nSeg', 'fmaxplot']: # ... except for the "hyperparameters" that are in the dictionary and json params files, but not in the GUI 
             k, d[k] = check_value(k, values[k])
+
     return d
 
 
@@ -104,9 +105,9 @@ def manage_params_combos(window, values):
 
     # modulation pattern
     if values['modFormat'] == 'step':
-        window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = True)
         window['Iss'].Update(disabled = True)
+        window['tb'].Update(disabled = True)
         window['RINplot'].Update(disabled = True)
         values['RINplot'] = False       # when enabling the element again, it should not be checked
         window['Hfplot'].Update(disabled = True)
@@ -115,7 +116,6 @@ def manage_params_combos(window, values):
         values['Eyeplot'] = False       # when enabling the element again, it should not be checked
     
     elif values['modFormat'] == 'pulse':
-        window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = True)
@@ -155,7 +155,6 @@ def manage_params_combos(window, values):
             values['Hfplot'] = False    # when enabling the element again, it should not be checked
 
     elif values['modFormat'] == 'random bits':
-        window['tmax'].Update(disabled = False)
         window['Ioff'].Update(disabled = False)
         window['Iss'].Update(disabled = True)
         window['tb'].Update(disabled = False)
@@ -224,18 +223,18 @@ def GUI():
         [sg.Frame('Current modulation pattern',[
             [sg.Combo(values=('step', 'pulse', 'steady state', 'small signal', 'random bits'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
             [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3, 1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
-            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3, 1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']=='small signal' or sp['modFormat']=='step'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
+            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3, 1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']!='pulse' and sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
             [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3, 2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
-            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9, 1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
+            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9, 1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, readonly=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
             ])],
         [sg.Frame('Results visualization',[
             [sg.Checkbox('2D mode profiles', key='Modes2Dplot', default=sp['Modes2Dplot'], size=(45,1), tooltip=ttips['Modes2Dplot'], enable_events=True)],
             [sg.Checkbox('Steady-state (LI) characteristic Popt(I)', key='PIplot', default=sp['PIplot'], size=(45,1), tooltip=ttips['PIplot'], enable_events=True)],
             [sg.Checkbox('Dynamic characteristic Popt(t)', key='Ptplot', default=sp['Ptplot'], tooltip=ttips['Ptplot'], enable_events=True)],
             [sg.Checkbox('2D optical & carrier profiles within the cavity', key='NwS2Dplot', default=sp['NwS2Dplot'], size=(45,1), tooltip=ttips['NwS2Dplot'], enable_events=True)],
-            [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RINplot', default=sp['RINplot'], disabled=(sp['Noise']!=True), tooltip=ttips['RINplot'], enable_events=True)],
-            [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['Noise']==True), tooltip=ttips['Hfplot'], enable_events=True)],
-            [sg.Checkbox('Eye diagram', key='Eyeplot', default=sp['Eyeplot'], tooltip=ttips['Eyeplot'], enable_events=True)],
+            [sg.Checkbox('Relative Intensity Noise (RIN) spectrum', key='RINplot', default=sp['RINplot'], disabled=(sp['Noise']!=True or sp['modFormat']!='steady state'), tooltip=ttips['RINplot'], enable_events=True)],
+            [sg.Checkbox('Frequency response H(f)', key='Hfplot', default=sp['Hfplot'], disabled=(sp['Noise']==True or sp['modFormat']!='small signal'), tooltip=ttips['Hfplot'], enable_events=True)],
+            [sg.Checkbox('Eye diagram', key='Eyeplot', default=sp['Eyeplot'], disabled=(sp['modFormat']!='random bits'), tooltip=ttips['Eyeplot'], enable_events=True)],
             ])],
         ]
 
@@ -305,28 +304,18 @@ def GUI():
             break
 
         elif event == 'initialize params':
-            if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
-            if 'sr' in locals():    
-                del sp, vp, sr
-            else:
-                del sp, vp
+            sp, vp, sr = {}, {}, {}
             params = load_params('default_params.json')         # loads params file and populates dictionaries sp and vp
-            sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded
+            sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults'] # simulation results not loaded
             del params
             save_params(sp, vp, {}, 'last_params.json')         # simulation results not saved to "last_params.json"
             update_gui(window, values, sp, vp)
 
         elif event == 'load file':
-            if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
-            if 'sr' in locals():    
-                del sp, vp, sr
-            else:
-                del sp, vp
+            sp, vp, sr = {}, {}, {}
             file_name = values['load file']
             if file_name != '':
-                params = load_params(file_name)             # loads params file and populates dictionaries sp and vp
+                params = load_params(file_name)             # loads params file and populates dictionaries sp, vp and sr
                 sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, Nw, ur, etc.)
                 del params
                 update_gui(window, values, sp, vp)
@@ -334,75 +323,54 @@ def GUI():
 
         elif event == 'save file':
             file_name = values['save file']
-            if 'S' in locals():
-                sr = {
-                    "phi": phi.tolist(),    # dictionary can't store numpy arrays -> conversion to list
-                    "nphi": nphi,
-                    "rho": rho.tolist(),
-                    "nrho": nrho,
-                    "nNw": nNw,
-                    "J0i": J0i.tolist(),
-                    "nS": nS,
-                    "LPlm": LPlm,
-                    "lvec": lvec.tolist(),
-                    "Ur": Ur.tolist(),
-                    "Icw": Icw.tolist(),
-                    "NScw": NScw.tolist(),
-                    "It": It.tolist(),
-                    "teval": teval.tolist(),
-                    "f": f.tolist(),
-                    "H": H.tolist(),
-                    "Hp": Hp.tolist(),
-                    "RIN": RIN.tolist(),
-                    "S2P": S2P.tolist(),
-                    "Nb": Nb.tolist(),
-                    "Nw": Nw.tolist(),
-                    "S": S.tolist(),
-                }
+            if 'sr' in locals():
+                for k, v in sr.items():         # dictionary can't store numpy arrays -> conversion to list
+                    if type(v) == np.ndarray:
+                        sr[k] = v.tolist()
             else:
                 sr = {}
             if file_name == '': file_name = 'last_params.json'
             save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
-            del sr
+            sr = {}
 
         elif event == 'run simulation':
-            save_params(sp, vp, {}, 'last_params.json') # simulation results not saved to "last_params.json"
-            if 'S' in locals():
-                del rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
-            
-            rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw = VISTAS1D(sp, vp)
+            sr = {}
+            save_params(sp, vp, sr, 'last_params.json') # simulation results not saved to "last_params.json"
+            sr = VISTAS1D(sp, vp)
             
             # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
-            sp['tmax'] = round(max(teval * 1e9), 0) * 1e-9
+            sp['tmax'] = round(max(sr['teval'] * 1e9), 0) * 1e-9
             window['tmax'].Update(int(sp['tmax'] * 1e9))
             values['tmax'] = int(sp['tmax'] * 1e9)
             
             # visualization            
             try:     # popup to collect figure number; 1 if invalid input
-                nfig = int(sg.popup_get_text(message= 'First figure number', title='', default_text='', size=(2, 1), no_titlebar = False, keep_on_top = True))
+                nfig = int(sg.popup_get_text(title='plot results', message= 'First figure number', default_text='1', size=(2, 1), background_color=None, keep_on_top = True))
             except:
                 nfig = 1
 
             if sp['Modes2Dplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
-                nfig = plotModes2D(Ur, LPlm, lvec, nS, rho*1e-2, nrho, phi, nphi, nfig=nfig)              
+                nfig = plotModes2D(sr['Ur'], sr['LPlm'], sr['lvec'], sr['nS'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig)  
         
             if sp['PIplot'] == 1:   # steady-state LI characteristic Popt(I)
-                nfig = plotPower(Icw * 1e3, S2P*NScw[NScw.shape[0]-nS:,:], LPlm, xlabel = 'current (mA)', nfig=nfig)  
-
+                NScw = sr['NScw']
+                nfig = plotPower(sr['Icw'] * 1e3, sr['S2P']*NScw[NScw.shape[0]-sr['nS']:,:], sr['LPlm'], xlabel = 'current (mA)', nfig=nfig)  
+                
             if sp['Ptplot'] == 1:   # dynamic response Popt(t)
-                nfig = plotPower(teval * 1e9, S2P*S, LPlm, xlabel = 'time (ns)', nfig=nfig)
+                nfig = plotPower(sr['teval'] * 1e9, sr['S2P']*sr['S'], sr['LPlm'], xlabel = 'time (ns)', nfig=nfig)
 
             if sp['NwS2Dplot'] == 1: # carrier and optical field profiles in the cavity
-                nfig = plotNwS2D(Nw[:, -1], J0i, S[:, -1], Ur, rho*1e-2, nrho, phi, nphi, nfig=nfig) # by default the last point of Nw
+                Nw, S = sr['Nw'],  sr['S']
+                nfig = plotNwS2D(Nw[:, -1], sr['J0i'], S[:, -1], sr['Ur'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig) # by default the last point of Nw
                 
             if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == True:
-                nfig = plotEye(teval, sp['dt'], sp['tb'], S2P*S, It, nfig=nfig)
+                nfig = plotEye(sr['teval'], sp['dt'], sp['tb'], sr['S2P']*sr['S'], sr['It'], nfig=nfig)
 
             if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
-                nfig = plotH(f, H, sp['Parasitics'], Hp, 0, 15, -10, 10, nfig=nfig)
+                nfig = plotH(sr['f'], sr['H'], sp['Parasitics'], sr['Hp'], 0, 15, -10, 10, nfig=nfig)
 
             if sp['Noise'] == True and sp['RINplot'] == True:
-                nfig = plotRIN(f, RIN, 0, 15, -160, -100, nfig=nfig)
+                nfig = plotRIN(sr['f'], sr['RIN'], 0, 15, -160, -100, nfig=nfig)
 
             plt.show(block = False)
 
@@ -410,7 +378,6 @@ def GUI():
             values = manage_params_combos(window, values)   # update GUI based on params combos
             sp = update_dict(values, sp)                    # update dictionary
             vp = update_dict(values, vp)                    # update dictionary
-            update_gui(window, values, sp, vp)
 
 
 def main():

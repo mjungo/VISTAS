@@ -635,7 +635,35 @@ def VISTAS1D(sp, vp):
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
-    return rho, nrho, phi, nphi, nNw, J0i, nS, LPlm, lvec, Ur, Icw, NScw, It, f, H, Hp, RIN, S2P, teval, S, Nb, Nw
+    # 9. output dictionary sr constructed from individual variables 
+    
+    sr = {
+        "phi": phi,
+        "nphi": nphi,
+        "rho": rho,
+        "nrho": nrho,
+        "nNw": nNw,
+        "J0i": J0i,
+        "nS": nS,
+        "LPlm": LPlm,
+        "lvec": lvec,
+        "Ur": Ur,
+        "wl": wl,
+        "Icw": Icw,
+        "NScw": NScw,
+        "It": It,
+        "teval": teval,
+        "f": f,
+        "H": H,
+        "Hp": Hp,
+        "RIN": RIN,
+        "S2P": S2P,
+        "Nb": Nb,
+        "Nw": Nw,
+        "S": S,
+        }
+
+    return sr
 
     
 def main():
