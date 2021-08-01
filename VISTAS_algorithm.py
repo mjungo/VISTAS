@@ -318,7 +318,7 @@ def parasiticsFilter(dt, n, Cp, Rm, Ca, Ra, It):
     # plt.plot(IHt)
     # plt.show()
 
-    return Hp, IHt
+    return np.abs(Hp), IHt  # returns the real amplitude of Hp so that it can be saved in a json file
 
 
 def VISTAS1D(sp, vp):
