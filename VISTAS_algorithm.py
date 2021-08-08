@@ -283,7 +283,7 @@ def HfResp(S, n, dt, fmaxplot, Parasitics, Hp):
     return f, H, Hp
 
 
-def RINcalc(P, n, dt, nSeg, fmaxplot):
+def RINcalc(S, n, dt, nSeg, fmaxplot):
 
     # 0. frequency vector from 0 to fmaxplot (GHz)
     n = n // nSeg # time-domain response sliced into nSeg segments of length n/nSeg
@@ -292,18 +292,17 @@ def RINcalc(P, n, dt, nSeg, fmaxplot):
     f = np.arange(start=0, stop=fmax, step=df)
     f = f[f<=fmaxplot] * 1e-9  # GHz
     #f = np.arange(start=0, stop=fmaxplot, step=1/n/dt)*1e-9    # cap f array at fmaxplot (default: 25GHz)
-    # 1. power vector
-    Pmean =  np.mean(P) # average over the complete vector (all segments)
-    P2D = np.reshape(P, (nSeg, int(P.shape[0]/nSeg)))   # slice vector into nSeg segments
-    # 2. FFT to transform to frequency domain (-> complex)
-    DP = fft(P2D - Pmean, axis=1)
-    # 3. compute amplitude as product of DP and its complex conjugate, remove 0 complex element
-    DP = DP * np.conj(DP) / n
-    DP = DP.real
+    # 1. compute average photon density prior to reshaping the vector into 'nseg' segments
+    Smean =  np.mean(S) # average over the complete vector (all segments)
+    S2D = np.reshape(S, (nSeg, int(S.shape[0]/nSeg)))   # slice vector into nSeg segments
+    # 2. FFT of the fluctuations around 0
+    DS = fft(S2D - Smean, axis=1)
+    # 3. compute linear RIN
+    RINlin = 1 / Smean**2 * dt / n * np.abs(DS)**2
     # 4. compute average over nSeg segments
-    DP = np.mean(DP, 0)
+    RINlin = np.mean(RINlin, 0)
     # 5. compute RIN in dB   
-    RIN = 10 * np.log10(dt * DP / Pmean**2)
+    RIN = 10 * np.log10(RINlin)
 
     return f[1:], RIN[1:f.shape[0]]
 
@@ -393,7 +392,7 @@ def VISTAS1D(sp, vp):
     tauS = 1 / vg / (alpham + alphai)                       # photon lifetime (to calculate Rolo - optical losses and outcoupling)
     F = (1 - Rt) / ((1 - Rt) + np.sqrt(Rt / Rb) * (1 - Rb)) # fraction of power emitted at the top facet
     etaOpt = F * alpham / (alphai + alpham)                 # optical efficiency (etaOpt*etai=etaD)  
-    S2P = etaOpt * hvl / wl * 1e-9 * Vw / tauS / GamZ * 1e3 # conversion factor photon density -> optical power (nS, 1)
+    S2P = etaOpt * hvl / wl * Vw / tauS / GamZ * 1e-6       # conversion factor modal photon density (cm-3) -> modal optical power (mw)
 
     tEnd = time.time()
     print(f'Mode profiles computation ({nS} modes): {np.round(tEnd - tStart, 3)}s')
@@ -614,7 +613,7 @@ def VISTAS1D(sp, vp):
 
         if sp['RINplot'] == True:
             tStart = time.time()
-            f, RIN = RINcalc(np.sum(S* S2P, 0), n, dt, sp['nSeg'], sp['fmaxplot'])      # compute RIN spectrum
+            f, RIN = RINcalc(np.sum(S, 0), n, dt, sp['nSeg'], sp['fmaxplot'])      # compute RIN spectrum
             tEnd = time.time()
             print(f'RIN calculation: {np.round(tEnd - tStart, 3)}s')
 
