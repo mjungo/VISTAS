@@ -369,12 +369,32 @@ def VISTAS1D(sp, vp):
     norm = norm[:, np.newaxis]
     Ur = Ur / norm      # normalized intensity profile
 
-    # size correction of parameters defined individually for each mode
-    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(vp['Rt'] * vp['Rb'])) * np.ones((nS, 1))   # mirror losses
-    alphai = vp['alphai'] * np.ones((nS, 1))
-    epsilon = vp['epsilon'] * np.ones((nS, 1))
-    beta = vp['beta'] / nS * np.ones((nS, 1))   # division by nS to spread the spontaneous emission homogeneously over all modes (-> not additive!)
-    GamZ = GamZ * np.ones((nS, 1))
+    # modal adjustments
+    if nS <= 9:
+        rxc = np.array(vp['rxc'][:nS], ndmin = 2).T # Reflectivity modal vector
+        axc = np.array(vp['axc'][:nS], ndmin = 2).T # Int optical losses modal vector 
+        bxc = np.array(vp['bxc'][:nS], ndmin = 2).T # Spontaneous emission modal vector
+        exc = np.array(vp['exc'][:nS], ndmin = 2).T # Gain compression modal vector
+    else:
+        concat = np.ones((nS - 9, 1))   # pads the modes of order higher than nine with ones
+        rxc = np.concatenate((np.array(vp['rxc'][:nS], ndmin = 2).T, concat), axis = 0)
+        axc = np.concatenate((np.array(vp['axc'][:nS], ndmin = 2).T, concat), axis = 0)
+        bxc = np.concatenate((np.array(vp['bxc'][:nS], ndmin = 2).T, concat), axis = 0)
+        exc = np.concatenate((np.array(vp['exc'][:nS], ndmin = 2).T, concat), axis = 0)
+    
+    Rb, Rt = vp['Rb'] * rxc, vp['Rt'] * rxc
+    alphai = vp['alphai'] * axc
+    epsilon = vp['epsilon'] * exc
+    beta = vp['beta'] / nS * bxc   # division by nS to spread the spontaneous emission homogeneously over all modes (-> not additive!)
+    #GamZ = GamZ * np.ones((nS, 1))
+
+    # temp optical parameters calculation
+    alpham = 1 / vp['Leff'] * np.log(1 / np.sqrt(Rt * Rb))  # mirror losses
+    tauS = 1 / vg / (alpham + alphai)                       # photon lifetime (to calculate Rolo - optical losses and outcoupling)
+    F = (1 - Rt) / ((1 - Rt) + np.sqrt(Rt / Rb) * (1 - Rb)) # fraction of power emitted at the top facet
+    etaOpt = F * alpham / (alphai + alpham)                 # optical efficiency (etaOpt*etai=etaD)  
+    S2P = etaOpt * hvl / wl * 1e-9 * Vw / tauS / GamZ * 1e3 # conversion factor photon density -> optical power (nS, 1)
+
     tEnd = time.time()
     print(f'Mode profiles computation ({nS} modes): {np.round(tEnd - tStart, 3)}s')
 
@@ -423,15 +443,8 @@ def VISTAS1D(sp, vp):
     
     tEnd = time.time()
     print(f'Overlap parameters computation: {np.round(tEnd - tStart, 3)}s') 
-
-    # 5. temp optical parameters derivation ------------------------------------------------------------
     
-    tauS = 1 / vg / (alpham + alphai) # photon lifetime (to calculate the Rolo - the optical losses and outcoupling)
-    F = (1 - vp['Rt']) / ((1 - vp['Rt']) + np.sqrt(vp['Rt'] / vp['Rb']) * (1 - vp['Rb'])) # fraction of power emitted at the top facet
-    etaOpt = F * alpham / (alphai + alpham)             # optical efficiency (etaOpt*etai=etaD)  
-    S2P = etaOpt * hvl / vp['wl0'] * Vw / tauS / GamZ * 1e3 # conversion factor photon density -> optical power (nS, 1)
-    
-    # 6. current and time characteristics --------------------------------------------------------------
+    # 5. current and time characteristics --------------------------------------------------------------
 
     tStart = time.time()
     Hp = np.zeros((1,1))                # initialization as empty np array to allow saving results even if no parasitics filtering is calculated
@@ -497,7 +510,7 @@ def VISTAS1D(sp, vp):
     print(f'Current signal generation: {np.round(tEnd - tStart, 3)}s')
 
        
-    # 7. steady-state (LI) solution --------------------------------------------------------------------
+    # 6. steady-state (LI) solution --------------------------------------------------------------------
 
     tStart = time.time() 
     Imax = 10e-3                                    # current range for LI characteristic
@@ -536,30 +549,30 @@ def VISTAS1D(sp, vp):
     tEnd = time.time()
     print(f'LI solution: {np.round(tEnd - tStart, 3)}s')
 
-    # 8. solver main loop ------------------------------------------------------------------------------
+    # 7. solver main loop ------------------------------------------------------------------------------
 
     tStart = time.time() 
-    Nb = np.zeros((nNb, n))            # Nb(t)
-    Nw = np.zeros((nNw, n))            # Nw0(t), Nw1(t), ..., NnNw(t)
-    S = np.zeros((nS, n))              # multimode photon number matrix
+    Nb = np.zeros((nNb, n))                 # Nb(t)
+    Nw = np.zeros((nNw, n))                 # Nw0(t), Nw1(t), ..., NnNw(t)
+    S = np.zeros((nS, n))                   # multimode photon number matrix
 
-    FS = np.zeros((nS, 1))              # modal noise terms
+    FS = np.zeros((nS, 1))                  # modal noise terms
 
-    NSinit = NScwInterp(It[0])          # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
+    NSinit = NScwInterp(It[0])              # result of steady-state (LI) characteristic (extrapolated) as starting point to avoid initial fluctuations
     
-    f = np.zeros((1,1))                 # initialization as empty np array to allow saving results even if no freq response or RIN is calculated
-    H = np.zeros((1,1))                 # initialization as empty np array to allow saving results even if no freq response is calculated
-    RIN = np.zeros((1,1))               # initialization as empty np array to allow saving results even if no RIN is calculated
+    f = np.zeros((1,1))                     # initialization as empty np array to allow saving results even if no freq response or RIN is calculated
+    H = np.zeros((1,1))                     # initialization as empty np array to allow saving results even if no freq response is calculated
+    RIN = np.zeros((1,1))                   # initialization as empty np array to allow saving results even if no RIN is calculated
 
-    if sp['odeSolver'] == 'Finite Diff.':   # 8a. solution of system of ODEs using finite differences with constant time-step
+    if sp['odeSolver'] == 'Finite Diff.':   # 7a. solution of system of ODEs using finite differences with constant time-step
 
-        Nbto = np.zeros((nNb, 1))       # temp variable passed to FD calculation function ('o' for 'old')
-        Nwto = np.zeros((nNw, 1))       # temp variable passed to FD calculation function ('o' for 'old')
-        Sto = np.zeros((nS, 1))         # temp variable passed to FD calculation function ('o' for 'old')
+        Nbto = np.zeros((nNb, 1))           # temp variable passed to FD calculation function ('o' for 'old')
+        Nwto = np.zeros((nNw, 1))           # temp variable passed to FD calculation function ('o' for 'old')
+        Sto = np.zeros((nS, 1))             # temp variable passed to FD calculation function ('o' for 'old')
 
-        Nb[:, 0] = NSinit[0]            # first point initialized at the LI value: Nb @ I(t=0)
-        Nw[:, 0] = NSinit[1:nNb+nNw]    # first point initialized at the LI value: Nw @ I(t=0)
-        S[:, 0] = NSinit[nNb+nNw:]      # first point initialized at the LI value: Sm @ I(t=0)
+        Nb[:, 0] = NSinit[0]                # first point initialized at the LI value: Nb @ I(t=0)
+        Nw[:, 0] = NSinit[1:nNb+nNw]        # first point initialized at the LI value: Nw @ I(t=0)
+        S[:, 0] = NSinit[nNb+nNw:]          # first point initialized at the LI value: Sm @ I(t=0)
      
         for ti in range(n - 1):
             Nbto[0, 0] = Nb[0, ti]
@@ -568,9 +581,9 @@ def VISTAS1D(sp, vp):
 
             dNbdt, dNwdt, dSdt, Rsp = FDsolver_1D_transp(sp['SCHtransp'], Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_injw, It[ti], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], tauS) # rhs of system of ODEs
             
-            Nbtn = Nbto + dt * dNbdt            # Finite Differences step ('n' in Nbtn stands for for 'new')
-            Nwtn = Nwto + dt * dNwdt            # Finite Differences step          
-            Stn = Sto + dt * dSdt               # Finite Differences step
+            Nbtn = Nbto + dt * dNbdt        # Finite Differences step ('n' in Nbtn stands for for 'new')
+            Nwtn = Nwto + dt * dNwdt        # Finite Differences step          
+            Stn = Sto + dt * dSdt           # Finite Differences step
 
             # addition of noise
             if sp['Noise'] == True:
@@ -614,7 +627,7 @@ def VISTAS1D(sp, vp):
         n = len(teval)
         dt = sp['dt']
  
-    else:   # 8b.solution of system of ODEs using 'solve_ivp'
+    else:   # 7b.solution of system of ODEs using 'solve_ivp'
 
         tStart = time.time()        
         Itinterp = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
@@ -635,7 +648,7 @@ def VISTAS1D(sp, vp):
             tEnd = time.time()
             print(f'Frequency response calculation: {np.round(tEnd - tStart, 3)}s')
 
-    # 9. output dictionary sr constructed from individual variables 
+    # 8. output dictionary sr constructed from individual variables 
     
     sr = {
         "phi": phi,
