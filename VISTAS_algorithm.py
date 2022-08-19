@@ -110,19 +110,19 @@ def Jac_cw_1D_transp(y, *args):
     #Stot = np.sum(S)
     #Sratio = S / Stot
 
-    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                             # dfNb/dNb (1,  1)
-    d10 = c_injw / Vr / tauCap                                                              # dfNw/dNb (nNw,1)
-    d20 = np.zeros((nS, 1))                                                                 # dfS/dNb  (nS, 1)
+    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                                         # dfNb/dNb (1,  1)
+    d10 = c_injw / Vr / tauCap                                                                          # dfNw/dNb (nNw,1)
+    d20 = np.zeros((nS, 1))                                                                             # dfS/dNb  (nS, 1)
     
-    d01 = np.zeros((1, nNw))                                                                # dfNb/dNw (1,  nNw)
+    d01 = np.zeros((1, nNw))                                                                            # dfNb/dNw (1,  nNw)
     d01[0, 0] = Vr / tauEsc
-    d11 = -(1/tauw + c_diff) * diag_nNw - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)     # dfNw/dNw (nNw,nNw)
-    d21 = GamZ * beta / tauNw * slice_nSnNw + GamZ * g0 * c_st[:, 0, :] * Sterm             # dfS/dNw  (nS, nNw)
-    #21 = GamZ * beta / tauNw * slice_nSnNw * Sratio + GamZ * g0 * c_st[:, 0, :] * Sterm    # dfS/dNw  (nS, nNw)
+    d11 = -(1/tauw + c_diff) * diag_nNw - np.sum(g0[:,:,np.newaxis] * c_st * Sterm[:,:,np.newaxis] , 0) # dfNw/dNw (nNw,nNw)
+    d21 = GamZ * beta / tauNw * slice_nSnNw + GamZ * g0 * c_st[:, 0, :] * Sterm                         # dfS/dNw  (nS, nNw)
+    #21 = GamZ * beta / tauNw * slice_nSnNw * Sratio + GamZ * g0 * c_st[:, 0, :] * Sterm                # dfS/dNw  (nS, nNw)
     
-    d02 = np.zeros((1, nS))                                                                 # dfNb/dS  (1,  nS)
-    d12 = -(Ngain / Scompr**2).T                                                            # dfNw/dS  (nNw,nS)
-    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                            # dfS/dS   (nS, nS)
+    d02 = np.zeros((1, nS))                                                                             # dfNb/dS  (1,  nS)
+    d12 = -(Ngain / Scompr**2).T                                                                        # dfNw/dS  (nNw,nS)
+    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                                        # dfS/dS   (nS, nS)
     #d22 = (-1 / tauS + GamZ * beta * Nw[0, :] / tauNw / Stot**2 * (diag_nS * Stot - np.tile(S.T, (nS, 1))) + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS
 
     col0 = np.concatenate((d00, d10, d20), 0)
@@ -222,7 +222,7 @@ def FDsolver_1D_transp(SCHtransp, Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_inj
     
     Na = max(np.matmul(c_act, Nwto), 1)                     # average carrier density over the active area
     g0 = gln * np.log(Na / Ntr) / (Na - Ntr)                # instantaneous linear gain coefficient, fitted to logarithmic gain function (-> time domain)
-
+  
     Injb = c_injb * It                                      # current injection into the barriers
 
     if SCHtransp == True:
@@ -361,6 +361,7 @@ def VISTAS1D(sp, vp):
     # field profiles
     tStart = time.time()    
     nS, lvec, LPlm, ur, wl = LP_modes(vp['wl0']* 1e-9, vp['nc'], vp['dn'], vp['rox'] * 1e-2, nrho, rho.T * 1e-2, alpha = 10)
+    #print(wl)
 
     # normalized intensity profiles
     Ur = np.square(ur)  # field amplitude -> intensity
@@ -394,6 +395,13 @@ def VISTAS1D(sp, vp):
     etaOpt = F * alpham / (alphai + alpham)                 # optical efficiency (etaOpt*etai=etaD)  
     S2P = etaOpt * hvl / wl * Vw / tauS / GamZ * 1e-6       # conversion factor modal photon density (cm-3) -> modal optical power (mw)
 
+    # computation of the material gain for each mode wavelength (parabolic material gain spectrum)
+    if sp['GainSpectr'] == True:
+       gln = vp['gln'] * (1 - 2 * ((wl * 1e9 - vp['wlp0']) / vp['glw'])**2)
+    else:
+       gln = vp['gln'] * np.ones((nS, 1))
+    #print(f'gln = {gln}')
+    
     tEnd = time.time()
     print(f'Mode profiles computation ({nS} modes): {np.round(tEnd - tStart, 3)}s')
 
@@ -540,7 +548,7 @@ def VISTAS1D(sp, vp):
 
     # main solver loop: sol@I0: 0, sol@I1: NScw[:, 1] calculated analytically above, sol@I3...n calculated below using fsolve and Jacobian
     for i in range(2, Icw.shape[0], 1):
-        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Icw[i], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)
+        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Icw[i], c_diff, gln, c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)
         NScw[:, i] = fsolve(cw_1D_transp, NScw[:, i-1], args = args, fprime = Jac_cw_1D_transp)
 
     # interpolation function for later use
@@ -572,15 +580,15 @@ def VISTAS1D(sp, vp):
         Nb[:, 0] = NSinit[0]                # first point initialized at the LI value: Nb @ I(t=0)
         Nw[:, 0] = NSinit[1:nNb+nNw]        # first point initialized at the LI value: Nw @ I(t=0)
         S[:, 0] = NSinit[nNb+nNw:]          # first point initialized at the LI value: Sm @ I(t=0)
-     
+
         for ti in range(n - 1):
             Nbto[0, 0] = Nb[0, ti]
             Nwto[:, 0] = Nw[:, ti]
             Sto[:, 0] = S[:, ti]
 
-            dNbdt, dNwdt, dSdt, Rsp = FDsolver_1D_transp(sp['SCHtransp'], Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_injw, It[ti], c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], tauS) # rhs of system of ODEs
+            dNbdt, dNwdt, dSdt, Rsp = FDsolver_1D_transp(sp['SCHtransp'], Nbto, Nwto, Sto, nNw, Vr, c_act, c_injb, c_injw, It[ti], c_diff, gln, c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], tauS) # rhs of system of ODEs
             
-            Nbtn = Nbto + dt * dNbdt        # Finite Differences step ('n' in Nbtn stands for for 'new')
+            Nbtn = Nbto + dt * dNbdt        # Finite Differences step ('n' in Nbtn stands for 'new')
             Nwtn = Nwto + dt * dNwdt        # Finite Differences step          
             Stn = Sto + dt * dSdt           # Finite Differences step
 
@@ -631,7 +639,7 @@ def VISTAS1D(sp, vp):
         tStart = time.time()        
         Itinterp = interp1d(x = teval, y = It, fill_value = "extrapolate") # current changes over time and must match the solve_ivp integration points
         
-        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Itinterp, c_diff, vp['gln'], c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)       
+        args = (sp['SCHtransp'], nNb, nNw, nS, Vr, c_act, c_injb, c_injw, Itinterp, c_diff, gln, c_st, vp['Ntr'], epsilon, GamZ, beta, vp['tauNb'], vp['tauNw'], vp['tauCap'], vp['tauEsc'], taub, tauw, tauS)       
         sol = solve_ivp(ODEsolver_1D_transp, (0, sp['tmax']), NSinit, t_eval=teval, method=sp['odeSolver'], dense_output=True, vectorized=True, args=args, rtol=1e-6, atol=1e-6, jac=Jac_1D_transp)
 
         Nb = sol.y[0]

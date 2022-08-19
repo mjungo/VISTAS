@@ -1,6 +1,7 @@
 {
     "simParams": {
         "SCHtransp": true,
+        "GainSpectr": true,
         "ThermMod": false,
         "Noise": false,
         "Parasitics": false,
@@ -109,6 +110,8 @@
             0.0
         ],
         "gln": 1200.0,
+        "wlp0": 848.0,
+        "glw": 40.0,
         "Ntr": 1.8e+18,
         "epsilon": 5e-17,
         "exc": [

@@ -72,7 +72,7 @@ def update_dict(values, d):
 # GUI/params mgmt: check the type and correct the unit (ns->s, mA->A) to make sure correct values are stored in the dictionaries sp and vp
 def check_value(k, v):
 
-    if k in ['SCHtransp', 'ThermMod', 'Noise', 'Parasitics', '2D', 'Modes2Dplot', 'PIplot', 'Ptplot', 'NwS2Dplot', 'RINplot', 'Hfplot', 'Eyeplot']:
+    if k in ['SCHtransp', 'GainSpectr', 'ThermMod', 'Noise', 'Parasitics', '2D', 'Modes2Dplot', 'PIplot', 'Ptplot', 'NwS2Dplot', 'RINplot', 'Hfplot', 'Eyeplot']:
         try:
             v = bool(v)
         except:
@@ -84,7 +84,7 @@ def check_value(k, v):
             v = str(v)
         except:
             #sg.popup('String input expected', button_type=5, auto_close = True, auto_close_duration = 1.5)
-            v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
+                v = None    # in case last_params.json is saved before the value is corrected, it saves it as None (json: null)
 
     elif k == 'nNw':
         try:
@@ -233,6 +233,7 @@ def GUI():
     spTab_layout = [
         [sg.Frame('Simulated effects',[
             [sg.Checkbox('Carrier transport into the quantum wells', key='SCHtransp', default=sp['SCHtransp'], size=(45,1), disabled=False, tooltip=ttips['SCHtransp'], enable_events=True)],
+            [sg.Checkbox('Gain spectrum', key='GainSpectr', default=sp['GainSpectr'], disabled=False, tooltip=ttips['GainSpectr'], enable_events=True)],
             [sg.Checkbox('Thermal effects', key='ThermMod', default=sp['ThermMod'], disabled=True, tooltip=ttips['ThermMod'], enable_events=True)],
             [sg.Checkbox('Noise', key='Noise', default=sp['Noise'], tooltip=ttips['Noise'], enable_events=True)],
             [sg.Checkbox('Electrical parasitics', key='Parasitics', default=sp['Parasitics'], tooltip=ttips['Parasitics'], enable_events=True)],
@@ -285,7 +286,7 @@ def GUI():
         )],
         [sg.Frame('Equivalent waveguide parameters',
             [
-                [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: emission wavelength @300k (nm)', size=(40,1))],
+                [sg.InputText(vp['wl0'], key='wl0', size=(7,1), tooltip=ttips['wl0'], enable_events=True), sg.Text('wl0: cavity resonance wavelength @300K (nm)', size=(40,1))],
                 [sg.InputText(vp['nc'], key='nc', size=(7,1), tooltip=ttips['nc'], enable_events=True), sg.Text('nc: core equivalent refractive index')],
                 [sg.InputText(vp['ng'], key='ng', size=(7,1), tooltip=ttips['ng'], enable_events=True), sg.Text('ng: group refractive index')],
                 [sg.InputText(vp['dn'], key='dn', size=(7,1), tooltip=ttips['dn'], enable_events=True), sg.Text('dn: equivalent fractional refractive index change')],
@@ -302,6 +303,8 @@ def GUI():
         [sg.Frame('Gain parameters',
             [
                 [sg.InputText(vp['gln'], key='gln', size=(7,1), tooltip=ttips['gln'], enable_events=True), sg.Text('gln: logarithmic gain coefficient (cm-1)', size=(40,1))],
+                [sg.InputText(vp['wlp0'], key='wlp0', size=(7,1), tooltip=ttips['wlp0'], enable_events=True), sg.Text('wlp0: peak gain wavelength @300K')],
+                [sg.InputText(vp['glw'], key='glw', size=(7,1), tooltip=ttips['glw'], enable_events=True), sg.Text('glw: gain profile FWHM [nm]')],
                 [sg.InputText(vp['Ntr'], key='Ntr', size=(7,1), tooltip=ttips['Ntr'], enable_events=True), sg.Text('Ntr: transparency carrier density (cm-3)')],
                 [sg.InputText(vp['epsilon'], key='epsilon', size=(7,1), tooltip=ttips['epsilon'], enable_events=True), sg.Text('epsilon: gain compression factor')],
                 [sg.InputText(vp['GamR'], key='GamR', size=(7,1), tooltip=ttips['GamR'], enable_events=True), sg.Text('GamR: relative confinement factor')],
