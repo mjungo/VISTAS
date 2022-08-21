@@ -118,7 +118,7 @@ def Jac_cw_1D_transp(y, *args):
     d01[0, 0] = Vr / tauEsc
     d11 = -(1/tauw + c_diff) * diag_nNw - np.sum(g0[:,:,np.newaxis] * c_st * Sterm[:,:,np.newaxis] , 0) # dfNw/dNw (nNw,nNw)
     d21 = GamZ * beta / tauNw * slice_nSnNw + GamZ * g0 * c_st[:, 0, :] * Sterm                         # dfS/dNw  (nS, nNw)
-    #21 = GamZ * beta / tauNw * slice_nSnNw * Sratio + GamZ * g0 * c_st[:, 0, :] * Sterm                # dfS/dNw  (nS, nNw)
+    #d21 = GamZ * beta / tauNw * slice_nSnNw * Sratio + GamZ * g0 * c_st[:, 0, :] * Sterm               # dfS/dNw  (nS, nNw)
     
     d02 = np.zeros((1, nS))                                                                             # dfNb/dS  (1,  nS)
     d12 = -(Ngain / Scompr**2).T                                                                        # dfNw/dS  (nNw,nS)
@@ -197,18 +197,18 @@ def Jac_1D_transp(t, y, *args):
     Scompr = 1 + epsilon * S
     Sterm = S / Scompr
 
-    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                             # dfNb/dNb (1,  1)
-    d10 = c_injw / Vr / tauCap                                                              # dfNw/dNb (nNw,1)
-    d20 = np.zeros((nS, 1))                                                                 # dfS/dNb  (nS, 1)
+    d00 = np.atleast_1d(-1/taub)[:, np.newaxis]                                                         # dfNb/dNb (1,  1)
+    d10 = c_injw / Vr / tauCap                                                                          # dfNw/dNb (nNw,1)
+    d20 = np.zeros((nS, 1))                                                                             # dfS/dNb  (nS, 1)
     
-    d01 = np.zeros((1, nNw))                                                                # dfNb/dNw (1,  nNw)
+    d01 = np.zeros((1, nNw))                                                                            # dfNb/dNw (1,  nNw)
     d01[0, 0] = Vr / tauEsc
-    d11 = -(1/tauw + c_diff) * diag_nNw - g0 * np.sum(c_st * Sterm[:,:,np.newaxis] , 0)     # dfNw/dNw (nNw,nNw)
-    d21 = GamZ * beta / tauNw * slice_nNwnS + GamZ * g0 * c_st[:, 0, :] * Sterm             # dfS/dNw  (nS, nNw)
+    d11 = -(1/tauw + c_diff) * diag_nNw - np.sum(g0[:,:,np.newaxis] * c_st * Sterm[:,:,np.newaxis], 0)  # dfNw/dNw (nNw,nNw)
+    d21 = GamZ * beta / tauNw * slice_nNwnS + GamZ * g0 * c_st[:, 0, :] * Sterm                         # dfS/dNw  (nS, nNw)
     
-    d02 = np.zeros((1, nS))                                                                 # dfNb/dS  (1,  nS)
-    d12 = -(Ngain / Scompr**2).T                                                            # dfNw/dS  (nNw,nS)
-    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                            # dfS/dS   (nS, nS)
+    d02 = np.zeros((1, nS))                                                                             # dfNb/dS  (1,  nS)
+    d12 = -(Ngain / Scompr**2).T                                                                        # dfNw/dS  (nNw,nS)
+    d22 = (-1 / tauS + GamZ * Ngain[:, 0] / Scompr**2) * diag_nS                                        # dfS/dS   (nS, nS)
 
     col0 = np.concatenate((d00, d10, d20), 0)
     col1 = np.concatenate((d01, d11, d21), 0)
