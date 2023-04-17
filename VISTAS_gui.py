@@ -24,6 +24,7 @@
 
 import json
 import PySimpleGUI as sg
+import sys
 
 from VISTAS_algorithm import VISTAS1D
 from VISTAS_visualization import *
@@ -47,7 +48,7 @@ def update_gui(window, values, sp, vp):
                 window[k+str(i+1)].update(values[k+str(i+1)])
         else:
             values[k] = vp[k]                   # standard case ('normal)
-            window[k].update(values[k])
+            window[k].update(values[k]) 
     # manage_params_combos(window, values)
 
     return values
@@ -65,7 +66,7 @@ def update_dict(values, d):
                         d[k][i] = 1
             else:
                 k, d[k] = check_value(k, values[k])             # 'normal' parameters
-
+                
     return d
 
 
@@ -125,65 +126,66 @@ def save_params(sp, vp, sr, file_name):
 def manage_params_combos(window, values):
 
     # modulation pattern
-    if values['modFormat'] == 'step':
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
-        window['RINplot'].Update(disabled = True)
-        values['RINplot'] = False       # when enabling the element again, it should not be checked
-        window['Hfplot'].Update(disabled = True)
-        values['Hfplot'] = False        # when enabling the element again, it should not be checked
-        window['Eyeplot'].Update(disabled = True)
-        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
-    
-    elif values['modFormat'] == 'pulse':
-        window['Ioff'].Update(disabled = False)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
-        window['RINplot'].Update(disabled = True)
-        values['RINplot'] = False       # when enabling the element again, it should not be checked
-        window['Hfplot'].Update(disabled = True)
-        values['Hfplot'] = False        # when enabling the element again, it should not be checked
-        window['Eyeplot'].Update(disabled = True)
-        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
-
-    elif values['modFormat'] == 'steady state':
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = True)
-        window['Hfplot'].Update(disabled = True)
-        values['Hfplot'] = False        # when enabling the element again, it should not be checked
-        window['Eyeplot'].Update(disabled = True)
-        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
-        if values['Noise'] == True:
-            window['RINplot'].Update(disabled = False)
-        else:
+    match values['modFormat']:
+        case 'step':
+            window['Ioff'].Update(disabled = True)
+            window['Iss'].Update(disabled = True)
+            window['tb'].Update(disabled = True)
             window['RINplot'].Update(disabled = True)
-            values['RINplot'] = False   # when enabling the element again, it should not be checked
-
-    elif values['modFormat'] == 'small signal':
-        window['Ioff'].Update(disabled = True)
-        window['Iss'].Update(disabled = False)
-        window['tb'].Update(disabled = True)
-        window['RINplot'].Update(disabled = True)
-        values['RINplot'] = False       # when enabling the element again, it should not be checked
-        window['Eyeplot'].Update(disabled = True)
-        values['Eyeplot'] = False       # when enabling the element again, it should not be checked
-        if values['Noise'] == False:
-            window['Hfplot'].Update(disabled = False)
-        else:
+            values['RINplot'] = False       # when enabling the element again, it should not be checked
             window['Hfplot'].Update(disabled = True)
-            values['Hfplot'] = False    # when enabling the element again, it should not be checked
+            values['Hfplot'] = False        # when enabling the element again, it should not be checked
+            window['Eyeplot'].Update(disabled = True)
+            values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+    
+        case 'pulse':
+            window['Ioff'].Update(disabled = False)
+            window['Iss'].Update(disabled = True)
+            window['tb'].Update(disabled = True)
+            window['RINplot'].Update(disabled = True)
+            values['RINplot'] = False       # when enabling the element again, it should not be checked
+            window['Hfplot'].Update(disabled = True)
+            values['Hfplot'] = False        # when enabling the element again, it should not be checked
+            window['Eyeplot'].Update(disabled = True)
+            values['Eyeplot'] = False       # when enabling the element again, it should not be checked
 
-    elif values['modFormat'] == 'random bits':
-        window['Ioff'].Update(disabled = False)
-        window['Iss'].Update(disabled = True)
-        window['tb'].Update(disabled = False)
-        window['RINplot'].Update(disabled = True)
-        values['RINplot'] = False       # when enabling the element again, it should not be checked
-        window['Hfplot'].Update(disabled = True)
-        values['Hfplot'] = False        # when enabling the element again, it should not be checked
-        window['Eyeplot'].Update(disabled = False)
+        case 'steady state':
+            window['Ioff'].Update(disabled = True)
+            window['Iss'].Update(disabled = True)
+            window['tb'].Update(disabled = True)
+            window['Hfplot'].Update(disabled = True)
+            values['Hfplot'] = False        # when enabling the element again, it should not be checked
+            window['Eyeplot'].Update(disabled = True)
+            values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+            if values['Noise'] == True:
+                window['RINplot'].Update(disabled = False)
+            else:
+                window['RINplot'].Update(disabled = True)
+                values['RINplot'] = False   # when enabling the element again, it should not be checked
+
+        case 'small signal':
+            window['Ioff'].Update(disabled = True)
+            window['Iss'].Update(disabled = False)
+            window['tb'].Update(disabled = True)
+            window['RINplot'].Update(disabled = True)
+            values['RINplot'] = False       # when enabling the element again, it should not be checked
+            window['Eyeplot'].Update(disabled = True)
+            values['Eyeplot'] = False       # when enabling the element again, it should not be checked
+            if values['Noise'] == False:
+                window['Hfplot'].Update(disabled = False)
+            else:
+                window['Hfplot'].Update(disabled = True)
+                values['Hfplot'] = False    # when enabling the element again, it should not be checked
+
+        case 'random bits':
+            window['Ioff'].Update(disabled = False)
+            window['Iss'].Update(disabled = True)
+            window['tb'].Update(disabled = False)
+            window['RINplot'].Update(disabled = True)
+            values['RINplot'] = False       # when enabling the element again, it should not be checked
+            window['Hfplot'].Update(disabled = True)
+            values['Hfplot'] = False        # when enabling the element again, it should not be checked
+            window['Eyeplot'].Update(disabled = False)
 
     # disables tmax if defined automatically by the algorithm (for RIN and H)
     if values['RINplot'] == True or values['Hfplot']== True:
@@ -194,6 +196,7 @@ def manage_params_combos(window, values):
     # forces Finite Diff. as ODE solver if noise is selected
     if values['Noise'] == True:
         values['odeSolver'] = 'Finite Diff.'
+        window.Element('odeSolver').Update('Finite Diff.')
 
     # forces smaller timestep dtFD for Finite Diff. solver
     if values['odeSolver'] == 'Finite Diff.':
@@ -218,9 +221,10 @@ def manage_params_combos(window, values):
     return values
 
 
-# GUI/params mgmt: main function, incl. layout and events loop 
+# GUI/params mgmt: main function, incl. layout and events loop
 def GUI():
-    
+    print(sys.version)
+
     # 0. load last parameters into sp and vp dictionaries -------------------------------------------------------
     params = load_params('last_params.json')  # loads params file and populates dictionaries sp and vp
     sp, vp = params['simParams'], params['vcselParams'] # simulation results not loaded (for that, chose "load params" and select any file but last_params.json or default_params.json)
@@ -244,17 +248,17 @@ def GUI():
             [sg.InputText(sp['nNw'], key='nNw', size=(7,1), tooltip=ttips['nNw'], enable_events=True), sg.Text('radial resolution (typically 7-20 terms)', size=(40,1))],
             #[sg.Checkbox('store carrier terms Ni', key='storeN', default=sp['storeN'], disabled=True, tooltip=ttips['storeN'], enable_events=True)],
             [sg.Combo(values=('Finite Diff.', 'RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA'), key='odeSolver', default_value=sp['odeSolver'], size=(12,1), tooltip=ttips['odeSolver'], enable_events=True), sg.Text('ODE solver')],
-            [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, readonly=(sp['Hfplot']==True or sp['RINplot']==True), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
+            [sg.InputText(round(float(0 if sp['tmax'] is None else sp['tmax'])*1e9,0), key='tmax', size=(7,1), tooltip=ttips['tmax'], enable_events=True, disabled=(sp['Hfplot']==True or sp['RINplot']==True), disabled_readonly_background_color='grey'), sg.Text('simulated time (ns)')],
             [sg.InputText(round(float(0 if sp['dt'] is None else sp['dt'])*1e9,3), key='dt', size=(7,1), tooltip=ttips['dt'], enable_events=True), sg.Text('time resolution for storing and plotting (ns)')],
-            [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, readonly=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
+            [sg.InputText(round(float(0 if sp['dtFD'] is None else sp['dtFD'])*1e9,3), key='dtFD', size=(7,1), tooltip=ttips['dtFD'], enable_events=True, disabled=(sp['odeSolver']!='Finite Diff.'), disabled_readonly_background_color='grey'), sg.Text('time step for FD solution (ns)')],
     ]
         )],
         [sg.Frame('Current modulation pattern',[
             [sg.Combo(values=('step', 'pulse', 'steady state', 'small signal', 'random bits'), key='modFormat', default_value=sp['modFormat'], size=(12,1), tooltip=ttips['modFormat'], enable_events=True), sg.Text('modulation pattern')],
             [sg.InputText(round(float(0 if sp['Ion'] is None else sp['Ion'])*1e3, 1), key='Ion', size=(7,1), tooltip=ttips['Ion'], enable_events=True), sg.Text('ON current (mA)', size=(40,1))],
-            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3, 1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, readonly=(sp['modFormat']!='pulse' and sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
-            [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3, 2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, readonly=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
-            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9, 1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, readonly=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
+            [sg.InputText(round(float(0 if sp['Ioff'] is None else sp['Ioff'])*1e3, 1), key='Ioff', size=(7,1), tooltip=ttips['Ioff'], enable_events=True, disabled=(sp['modFormat']!='pulse' and sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('OFF current (mA)')],
+            [sg.InputText(round(float(0 if sp['Iss'] is None else sp['Iss'])*1e3, 2), key='Iss', size=(7,1), tooltip=ttips['Iss'], enable_events=True, disabled=(sp['modFormat']!='small signal'), disabled_readonly_background_color='grey'), sg.Text('small signal current step (mA)')],
+            [sg.InputText(round(float(0 if sp['tb'] is None else sp['tb'])*1e9, 1), key='tb', size=(7,1), tooltip=ttips['tb'], enable_events=True, disabled=(sp['modFormat']!='random bits'), disabled_readonly_background_color='grey'), sg.Text('bit duration (ns)')],
     ]
         )],
         [sg.Frame('Results visualization',[
@@ -329,6 +333,12 @@ def GUI():
                 [sg.InputText(vp['Ra'], key='Ra', size=(7,1), tooltip=ttips['Ra'], enable_events=True), sg.Text('Ra: active region parasitic resistance (ohm)')],
             ]
         )],
+        [sg.Frame('Thermal parameters',
+            [
+                [sg.InputText(vp['Rth'], key='Rth', size=(7,1), tooltip=ttips['Rth'], enable_events=True), sg.Text('Rth: thermal resistance (K/W)', size=(40,1))],
+               
+            ]
+        )],
     ]
 
     mpTab_layout = [
@@ -336,56 +346,56 @@ def GUI():
             sg.Frame('Mirrors reflectivity',
             [
                 [sg.Text('                   "cos"       "sin"')],
-                [sg.Text(' LP01      '), sg.InputText(vp['rxc'][0], key='rxc1', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][0], key='rxs1', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP11      '), sg.InputText(vp['rxc'][1], key='rxc2', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][1], key='rxs2', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP21      '), sg.InputText(vp['rxc'][2], key='rxc3', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][2], key='rxs3', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP02      '), sg.InputText(vp['rxc'][3], key='rxc4', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][3], key='rxs4', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP31      '), sg.InputText(vp['rxc'][4], key='rxc5', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][4], key='rxs5', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP12      '), sg.InputText(vp['rxc'][5], key='rxc6', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][5], key='rxs6', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP41      '), sg.InputText(vp['rxc'][6], key='rxc7', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][6], key='rxs7', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP22      '), sg.InputText(vp['rxc'][7], key='rxc8', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][7], key='rxs8', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP03      '), sg.InputText(vp['rxc'][8], key='rxc9', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][8], key='rxs9', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')]
+                [sg.Text(' LP01      '), sg.InputText(vp['rxc'][0], key='rxc1', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][0], key='rxs1', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP11      '), sg.InputText(vp['rxc'][1], key='rxc2', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][1], key='rxs2', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP21      '), sg.InputText(vp['rxc'][2], key='rxc3', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][2], key='rxs3', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP02      '), sg.InputText(vp['rxc'][3], key='rxc4', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][3], key='rxs4', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP31      '), sg.InputText(vp['rxc'][4], key='rxc5', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][4], key='rxs5', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP12      '), sg.InputText(vp['rxc'][5], key='rxc6', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][5], key='rxs6', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP41      '), sg.InputText(vp['rxc'][6], key='rxc7', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][6], key='rxs7', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP22      '), sg.InputText(vp['rxc'][7], key='rxc8', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][7], key='rxs8', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP03      '), sg.InputText(vp['rxc'][8], key='rxc9', size=(6,1), enable_events=True), sg.InputText(vp['rxs'][8], key='rxs9', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')]
             ], tooltip=ttips['modalParamsReflectivity']),
                 sg.Frame('Internal optical losses',
             [
                 [sg.Text('                   "cos"       "sin"')],
-                [sg.Text(' LP01      '), sg.InputText(vp['axc'][0], key='axc1', size=(6,1), enable_events=True), sg.InputText(vp['axs'][0], key='axs1', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP11      '), sg.InputText(vp['axc'][1], key='axc2', size=(6,1), enable_events=True), sg.InputText(vp['axs'][1], key='axs2', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP21      '), sg.InputText(vp['axc'][2], key='axc3', size=(6,1), enable_events=True), sg.InputText(vp['axs'][2], key='axs3', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP02      '), sg.InputText(vp['axc'][3], key='axc4', size=(6,1), enable_events=True), sg.InputText(vp['axs'][3], key='axs4', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP31      '), sg.InputText(vp['axc'][4], key='axc5', size=(6,1), enable_events=True), sg.InputText(vp['axs'][4], key='axs5', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP12      '), sg.InputText(vp['axc'][5], key='axc6', size=(6,1), enable_events=True), sg.InputText(vp['axs'][5], key='axs6', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP41      '), sg.InputText(vp['axc'][6], key='axc7', size=(6,1), enable_events=True), sg.InputText(vp['axs'][6], key='axs7', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP22      '), sg.InputText(vp['axc'][7], key='axc8', size=(6,1), enable_events=True), sg.InputText(vp['axs'][7], key='axs8', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP03      '), sg.InputText(vp['axc'][8], key='axc9', size=(6,1), enable_events=True), sg.InputText(vp['axs'][8], key='axs9', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')]
+                [sg.Text(' LP01      '), sg.InputText(vp['axc'][0], key='axc1', size=(6,1), enable_events=True), sg.InputText(vp['axs'][0], key='axs1', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP11      '), sg.InputText(vp['axc'][1], key='axc2', size=(6,1), enable_events=True), sg.InputText(vp['axs'][1], key='axs2', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP21      '), sg.InputText(vp['axc'][2], key='axc3', size=(6,1), enable_events=True), sg.InputText(vp['axs'][2], key='axs3', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP02      '), sg.InputText(vp['axc'][3], key='axc4', size=(6,1), enable_events=True), sg.InputText(vp['axs'][3], key='axs4', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP31      '), sg.InputText(vp['axc'][4], key='axc5', size=(6,1), enable_events=True), sg.InputText(vp['axs'][4], key='axs5', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP12      '), sg.InputText(vp['axc'][5], key='axc6', size=(6,1), enable_events=True), sg.InputText(vp['axs'][5], key='axs6', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP41      '), sg.InputText(vp['axc'][6], key='axc7', size=(6,1), enable_events=True), sg.InputText(vp['axs'][6], key='axs7', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP22      '), sg.InputText(vp['axc'][7], key='axc8', size=(6,1), enable_events=True), sg.InputText(vp['axs'][7], key='axs8', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP03      '), sg.InputText(vp['axc'][8], key='axc9', size=(6,1), enable_events=True), sg.InputText(vp['axs'][8], key='axs9', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')]
             ], tooltip=ttips['modalParamsIntOptLosses'])
         ],
         [
             sg.Frame('Spontaneous emission',
             [
                 [sg.Text('                   "cos"       "sin"')],
-                [sg.Text(' LP01      '), sg.InputText(vp['bxc'][0], key='bxc1', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][0], key='bxs1', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP11      '), sg.InputText(vp['bxc'][1], key='bxc2', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][1], key='bxs2', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP21      '), sg.InputText(vp['bxc'][2], key='bxc3', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][2], key='bxs3', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP02      '), sg.InputText(vp['bxc'][3], key='bxc4', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][3], key='bxs4', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP31      '), sg.InputText(vp['bxc'][4], key='bxc5', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][4], key='bxs5', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP12      '), sg.InputText(vp['bxc'][5], key='bxc6', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][5], key='bxs6', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP41      '), sg.InputText(vp['bxc'][6], key='bxc7', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][6], key='bxs7', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP22      '), sg.InputText(vp['bxc'][7], key='bxc8', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][7], key='bxs8', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP03      '), sg.InputText(vp['bxc'][8], key='bxc9', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][8], key='bxs9', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')]
+                [sg.Text(' LP01      '), sg.InputText(vp['bxc'][0], key='bxc1', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][0], key='bxs1', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP11      '), sg.InputText(vp['bxc'][1], key='bxc2', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][1], key='bxs2', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP21      '), sg.InputText(vp['bxc'][2], key='bxc3', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][2], key='bxs3', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP02      '), sg.InputText(vp['bxc'][3], key='bxc4', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][3], key='bxs4', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP31      '), sg.InputText(vp['bxc'][4], key='bxc5', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][4], key='bxs5', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP12      '), sg.InputText(vp['bxc'][5], key='bxc6', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][5], key='bxs6', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP41      '), sg.InputText(vp['bxc'][6], key='bxc7', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][6], key='bxs7', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP22      '), sg.InputText(vp['bxc'][7], key='bxc8', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][7], key='bxs8', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP03      '), sg.InputText(vp['bxc'][8], key='bxc9', size=(6,1), enable_events=True), sg.InputText(vp['bxs'][8], key='bxs9', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')]
             ], tooltip=ttips['modalParamsSpontEmission']),
                 sg.Frame('Gain compression',
             [
                 [sg.Text('                   "cos"       "sin"')],
-                [sg.Text(' LP01      '), sg.InputText(vp['exc'][0], key='exc1', size=(6,1), enable_events=True), sg.InputText(vp['exs'][0], key='exs1', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP11      '), sg.InputText(vp['exc'][1], key='exc2', size=(6,1), enable_events=True), sg.InputText(vp['exs'][1], key='exs2', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP21      '), sg.InputText(vp['exc'][2], key='exc3', size=(6,1), enable_events=True), sg.InputText(vp['exs'][2], key='exs3', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP02      '), sg.InputText(vp['exc'][3], key='exc4', size=(6,1), enable_events=True), sg.InputText(vp['exs'][3], key='exs4', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')],
-                [sg.Text(' LP31      '), sg.InputText(vp['exc'][4], key='exc5', size=(6,1), enable_events=True), sg.InputText(vp['exs'][4], key='exs5', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP01      '), sg.InputText(vp['exc'][5], key='exc6', size=(6,1), enable_events=True), sg.InputText(vp['exs'][5], key='exs6', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP41      '), sg.InputText(vp['exc'][6], key='exc7', size=(6,1), enable_events=True), sg.InputText(vp['exs'][6], key='exs7', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP22      '), sg.InputText(vp['exc'][7], key='exc8', size=(6,1), enable_events=True), sg.InputText(vp['exs'][7], key='exs8', size=(6,1), enable_events=True, readonly=(sp['2D']!=True), disabled_readonly_background_color='grey')],
-                [sg.Text(' LP03      '), sg.InputText(vp['exc'][8], key='exc9', size=(6,1), enable_events=True), sg.InputText(vp['exs'][8], key='exs9', size=(6,1), enable_events=True, readonly=True, disabled_readonly_background_color='grey')]
+                [sg.Text(' LP01      '), sg.InputText(vp['exc'][0], key='exc1', size=(6,1), enable_events=True), sg.InputText(vp['exs'][0], key='exs1', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP11      '), sg.InputText(vp['exc'][1], key='exc2', size=(6,1), enable_events=True), sg.InputText(vp['exs'][1], key='exs2', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP21      '), sg.InputText(vp['exc'][2], key='exc3', size=(6,1), enable_events=True), sg.InputText(vp['exs'][2], key='exs3', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP02      '), sg.InputText(vp['exc'][3], key='exc4', size=(6,1), enable_events=True), sg.InputText(vp['exs'][3], key='exs4', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')],
+                [sg.Text(' LP31      '), sg.InputText(vp['exc'][4], key='exc5', size=(6,1), enable_events=True), sg.InputText(vp['exs'][4], key='exs5', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP12      '), sg.InputText(vp['exc'][5], key='exc6', size=(6,1), enable_events=True), sg.InputText(vp['exs'][5], key='exs6', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP41      '), sg.InputText(vp['exc'][6], key='exc7', size=(6,1), enable_events=True), sg.InputText(vp['exs'][6], key='exs7', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP22      '), sg.InputText(vp['exc'][7], key='exc8', size=(6,1), enable_events=True), sg.InputText(vp['exs'][7], key='exs8', size=(6,1), enable_events=True, disabled=(sp['2D']!=True), disabled_readonly_background_color='grey')],
+                [sg.Text(' LP03      '), sg.InputText(vp['exc'][8], key='exc9', size=(6,1), enable_events=True), sg.InputText(vp['exs'][8], key='exs9', size=(6,1), enable_events=True, disabled=True, disabled_readonly_background_color='grey')]
             ], tooltip=ttips['modalParamsGainCompression']) 
         ],
     ]
@@ -404,87 +414,91 @@ def GUI():
     while True:
         
         event, values = window.read()
-        #print(event)
+        # print(event)
 
-        if event == sg.WIN_CLOSED:
-            save_params(sp, vp, {}, 'last_params.json')         # aggregates sp and vp in a dict of dicts and saves to a json file
-            break
+        match event:
+            case sg.WIN_CLOSED:
+                save_params(sp, vp, {}, 'last_params.json')         # aggregates sp and vp in a dict of dicts and saves to a json file
+                break
 
-        elif event == 'initialize params':
-            sp, vp, sr = {}, {}, {}
-            params = load_params('default_params.json')         # loads params file and populates dictionaries sp and vp
-            sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults'] # simulation results not loaded
-            del params
-            save_params(sp, vp, {}, 'last_params.json')         # simulation results not saved to "last_params.json"
-            update_gui(window, values, sp, vp)
-
-        elif event == 'load file':
-            sp, vp, sr = {}, {}, {}
-            file_name = values['load file']
-            if file_name != '':
-                params = load_params(file_name)             # loads params file and populates dictionaries sp, vp and sr
-                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, Nw, ur, etc.)
+            case 'initialize params':
+                sp, vp, sr = {}, {}, {}
+                params = load_params('default_params.json')         # loads params file and populates dictionaries sp and vp
+                sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults'] # simulation results not loaded
                 del params
+                save_params(sp, vp, {}, 'last_params.json')         # simulation results not saved to "last_params.json"
                 update_gui(window, values, sp, vp)
-                values = manage_params_combos(window, values)   # update GUI based on params combos
 
-        elif event == 'save file':
-            file_name = values['save file']
-            if 'sr' in locals():
-                for k, v in sr.items():         # dictionary can't store numpy arrays -> conversion to list
-                    if type(v) == np.ndarray:
-                        sr[k] = v.tolist()
-            else:
+            case 'load file':
+                sp, vp, sr = {}, {}, {}
+                file_name = values['load file']
+                if file_name != '':
+                    params = load_params(file_name)                 # loads params file and populates dictionaries sp, vp and sr
+                    sp, vp, sr = params['simParams'], params['vcselParams'], params['simResults']   # for post-processing, simulations results should be converted from list to numpy array and saved in the respective variables (S, Nw, ur, etc.)
+                    del params
+                    update_gui(window, values, sp, vp)
+                    values = manage_params_combos(window, values)   # update GUI based on params combos
+
+            case 'save file':
+                file_name = values['save file']
+                if 'sr' in locals():
+                    for k, v in sr.items():         # dictionary can't store numpy arrays -> conversion to list
+                        if type(v) == np.ndarray:
+                            sr[k] = v.tolist()
+                else:
+                    sr = {}
+                if file_name == '': file_name = 'last_params.json'
+                save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
                 sr = {}
-            if file_name == '': file_name = 'last_params.json'
-            save_params(sp, vp, sr, file_name)  # aggregates sp and vp and sr in a dict of dicts and saves to a json file
-            sr = {}
 
-        elif event == 'run simulation':
-            sr = {}
-            save_params(sp, vp, sr, 'last_params.json') # simulation results not saved to "last_params.json"
-            sr = VISTAS1D(sp, vp)
-            
-            # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
-            sp['tmax'] = round(max(sr['teval'] * 1e9), 0) * 1e-9
-            window['tmax'].Update(int(sp['tmax'] * 1e9))
-            values['tmax'] = int(sp['tmax'] * 1e9)
-            
-            # visualization            
-            try:     # popup to collect figure number; 1 if invalid input
-                nfig = int(sg.popup_get_text(title='plot results', message= 'First figure number', default_text='1', size=(2, 1), background_color=None, keep_on_top = True))
-            except:
-                nfig = 1
-
-            if sp['Modes2Dplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
-                nfig = plotModes2D(sr['Ur'], sr['LPlm'], sr['lvec'], sr['nS'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig)  
-        
-            if sp['PIplot'] == 1:   # steady-state LI characteristic Popt(I)
-                NScw = sr['NScw']
-                nfig = plotPower(sr['Icw'] * 1e3, sr['S2P']*NScw[NScw.shape[0]-sr['nS']:,:], sr['LPlm'], xlabel = 'current (mA)', nfig=nfig)  
+            case 'run simulation':
+                sr = {}
+                save_params(sp, vp, sr, 'last_params.json') # simulation results not saved to "last_params.json"
+                sr = VISTAS1D(sp, vp)
                 
-            if sp['Ptplot'] == 1:   # dynamic response Popt(t)
-                nfig = plotPower(sr['teval'] * 1e9, sr['S2P']*sr['S'], sr['LPlm'], xlabel = 'time (ns)', nfig=nfig)
-
-            if sp['NwS2Dplot'] == 1: # carrier and optical field profiles in the cavity
-                Nw, S = sr['Nw'],  sr['S']
-                nfig = plotNwS2D(Nw[:, -1], sr['J0i'], S[:, -1], sr['Ur'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig) # by default the last point of Nw
+                # extracts tmax from teval in case it is calculated in the main loop (RIN or Hf)
+                sp['tmax'] = round(max(sr['teval'] * 1e9), 0) * 1e-9
+                window['tmax'].Update(int(sp['tmax'] * 1e9))
+                values['tmax'] = int(sp['tmax'] * 1e9)
                 
-            if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == True:
-                nfig = plotEye(sr['teval'], sp['dt'], sp['tb'], sr['S2P']*sr['S'], sr['It'], nfig=nfig)
+                # visualization            
+                nfig = sg.popup_get_text(title='plot results', message= 'First figure number', default_text='1', size=(2, 1), background_color=None, keep_on_top = True)
+                if nfig != None:    # don't plot anything if "cancel" selected in popup
+                    try:     # popup to collect figure number; 1 if invalid input
+                        nfig = int(nfig)
+                    except:
+                        nfig = 1
 
-            if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
-                nfig = plotH(sr['f'], sr['H'], sp['Parasitics'], sr['Hp'], 0, 15, -10, 10, nfig=nfig)
+                    if sp['Modes2Dplot'] == 1:  # 2D mode profiles (cosine azimuthal distribution) Ur(x,y)
+                        nfig = plotModes2D(sr['Ur'], sr['LPlm'], sr['lvec'], sr['nS'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig)  
+                
+                    if sp['PIplot'] == 1:   # steady-state LI characteristic Popt(I)
+                        NScw = sr['NScw']
+                        nfig = plotPower(sr['Icw'] * 1e3, sr['S2P']*NScw[NScw.shape[0]-sr['nS']:,:], sr['LPlm'], xlabel = 'current (mA)', nfig=nfig)  
+                        
+                    if sp['Ptplot'] == 1:   # dynamic response Popt(t)
+                        nfig = plotPower(sr['teval'] * 1e9, sr['S2P']*sr['S'], sr['LPlm'], xlabel = 'time (ns)', nfig=nfig)
 
-            if sp['Noise'] == True and sp['RINplot'] == True:
-                nfig = plotRIN(sr['f'], sr['RIN'], 0, 15, -160, -100, nfig=nfig)
+                    if sp['NwS2Dplot'] == 1: # carrier and optical field profiles in the cavity
+                        Nw, S = sr['Nw'],  sr['S']
+                        nfig = plotNwS2D(Nw[:, -1], sr['J0i'], S[:, -1], sr['Ur'], sr['rho']*1e-2, sr['nrho'], sr['phi'], sr['nphi'], nfig=nfig) # by default the last point of Nw
+                        
+                    if sp['modFormat'] == 'random bits' and sp['Eyeplot'] == True:
+                        nfig = plotEye(sr['teval'], sp['dt'], sp['tb'], sr['S2P']*sr['S'], sr['It'], nfig=nfig)
 
-            plt.show(block = False)
+                    if sp['modFormat'] == 'small signal' and sp['Hfplot'] == True: # small signal response H(f)
+                        nfig = plotH(sr['f'], sr['H'], sp['Parasitics'], sr['Hp'], 0, 15, -10, 10, nfig=nfig)
 
-        else:   # case 'gui-element change'
-            values = manage_params_combos(window, values)   # update GUI based on params combos
-            sp = update_dict(values, sp)                    # update dictionary
-            vp = update_dict(values, vp)                    # update dictionary
+                    if sp['Noise'] == True and sp['RINplot'] == True:
+                        nfig = plotRIN(sr['f'], sr['RIN'], 0, 15, -160, -100, nfig=nfig)
+
+                    plt.show(block = False)
+
+            case _:   # case 'gui-element change'
+                values = manage_params_combos(window, values)   # update GUI based on params combos
+                sp = update_dict(values, sp)                    # update dictionary
+                vp = update_dict(values, vp)                    # update dictionary
+                # update_gui(window, values, sp, vp)
 
 
 def main():
